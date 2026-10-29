@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../wallet/wallet_transactions.dart';
+
 enum PaymentKind { wallet, cash, card, transfer }
 
 class PaymentMethod {
@@ -36,8 +38,52 @@ class WalletController extends Notifier<int> {
   @override
   int build() => 12500;
 
-  void debit(int amount) => state = state - amount;
-  void credit(int amount) => state = state + amount;
+  /// Takes money out and records it in the wallet history.
+  void debit(
+    int amount, {
+    WalletTxType type = WalletTxType.ridePayment,
+    String title = 'Ride payment',
+  }) {
+    state = state - amount;
+    _log(amount, type, title, 'GoRide Wallet');
+  }
+
+  /// Adds money (top-up or refund) and records it.
+  void credit(
+    int amount, {
+    WalletTxType type = WalletTxType.topUp,
+    String title = 'Top Up',
+    String method = '',
+    String? reference,
+    String? id,
+  }) {
+    state = state + amount;
+    _log(amount, type, title, method, reference: reference, id: id);
+  }
+
+  void _log(
+    int amount,
+    WalletTxType type,
+    String title,
+    String method, {
+    String? reference,
+    String? id,
+  }) {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    ref
+        .read(walletTransactionsProvider.notifier)
+        .add(
+          WalletTx(
+            id: id ?? 'TRX${stamp % 10000000000}',
+            type: type,
+            amount: amount,
+            title: title,
+            method: method,
+            createdAt: DateTime.now(),
+            reference: reference,
+          ),
+        );
+  }
 }
 
 final walletBalanceProvider = NotifierProvider<WalletController, int>(

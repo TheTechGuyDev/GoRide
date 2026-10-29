@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/app_button.dart';
@@ -99,6 +100,17 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
                         ],
                       ),
                     ),
+                    if (m.kind == PaymentKind.wallet)
+                      TextButton(
+                        onPressed: () => context.push(Routes.topUp),
+                        child: const Text(
+                          'Top up',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     if (selected)
                       const Icon(Icons.check, color: AppColors.primary),
                   ],

@@ -13,6 +13,11 @@ import '../../features/booking/where_to_screen.dart';
 import '../../features/activity/activity_tab.dart';
 import '../../features/activity/ride_details_screen.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/account/account_tab.dart';
+import '../../features/wallet/top_up_details_screen.dart';
+import '../../features/wallet/top_up_method_screen.dart';
+import '../../features/wallet/top_up_screen.dart';
+import '../../features/wallet/wallet_screen.dart';
 import '../../features/schedule/scheduled_ride_details_screen.dart';
 import '../../features/schedule/scheduling_screen.dart';
 import '../../features/trip/rate_driver_screen.dart';
@@ -78,8 +83,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: Routes.account,
-              builder: (_, _) =>
-                  const ComingSoonTab(title: 'Account', icon: Icons.person),
+              builder: (_, _) => const AccountTab(),
             ),
           ],
         ),
@@ -155,6 +159,27 @@ final appRouter = GoRouter(
       parentNavigatorKey: _rootKey,
       builder: (_, state) =>
           ScheduledRideDetailsScreen(rideId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: Routes.wallet,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const WalletScreen(),
+    ),
+    GoRoute(
+      path: Routes.topUp,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const TopUpScreen(),
+    ),
+    GoRoute(
+      path: Routes.topUpMethod,
+      parentNavigatorKey: _rootKey,
+      builder: (_, state) => TopUpMethodScreen(amount: state.extra as int),
+    ),
+    GoRoute(
+      path: Routes.topUpDetails,
+      parentNavigatorKey: _rootKey,
+      builder: (_, state) =>
+          TopUpDetailsScreen(txId: state.pathParameters['id']!),
     ),
     GoRoute(
       path: Routes.emergencyContacts,

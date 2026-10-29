@@ -8,6 +8,7 @@ import '../../core/utils/money.dart';
 import '../../core/widgets/app_button.dart';
 import '../activity/ride_history.dart';
 import '../booking/payment_methods.dart';
+import '../wallet/wallet_transactions.dart';
 import 'trip_controller.dart';
 import 'widgets/trip_widgets.dart';
 
@@ -252,7 +253,9 @@ class _TipDriverScreenState extends ConsumerState<TipDriverScreen> {
       return;
     }
     final trip = ref.read(tripControllerProvider);
-    ref.read(walletBalanceProvider.notifier).debit(tip);
+    ref
+        .read(walletBalanceProvider.notifier)
+        .debit(tip, type: WalletTxType.tip, title: 'Driver tip');
     if (trip != null) {
       ref
           .read(rideHistoryProvider.notifier)

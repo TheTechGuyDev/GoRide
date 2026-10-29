@@ -61,8 +61,8 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
             'Choose another payment method or top up.',
           ),
           action: SnackBarAction(
-            label: 'Change',
-            onPressed: () => context.push(Routes.paymentMethod),
+            label: 'Top up',
+            onPressed: () => context.push(Routes.topUp),
           ),
         ),
       );

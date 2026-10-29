@@ -334,7 +334,9 @@ class TripController extends Notifier<TripState?> {
     final s = state;
     if (s == null) return;
     if (s.paymentId == 'wallet') {
-      ref.read(walletBalanceProvider.notifier).debit(s.total);
+      ref
+          .read(walletBalanceProvider.notifier)
+          .debit(s.total, title: 'Ride to ${s.destination.name}');
     }
     state = s.copyWith(
       phase: TripPhase.completed,

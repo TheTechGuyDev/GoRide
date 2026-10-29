@@ -10,9 +10,11 @@ import '../booking/payment_methods.dart';
 import '../trip/trip_controller.dart';
 import '../trip/trip_models.dart';
 import '../schedule/scheduled_rides.dart';
+import '../wallet/wallet_screen.dart';
+import '../wallet/wallet_transactions.dart';
 import 'ride_history.dart';
 
-enum _Filter { ongoing, scheduled, completed, canceled }
+enum _Filter { ongoing, scheduled, completed, canceled, topUp }
 
 /// Screens 51, 56, 59: ride history.
 class ActivityTab extends ConsumerStatefulWidget {
@@ -72,6 +74,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                         _Filter.scheduled => 'Scheduled',
                         _Filter.completed => 'Completed',
                         _Filter.canceled => 'Canceled',
+                        _Filter.topUp => 'Top Up',
                       }),
                       selected: filter == f,
                       showCheckmark: false,
@@ -101,6 +104,8 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                 ? _OngoingView(trip: ongoing)
                 : filter == _Filter.scheduled
                 ? const _ScheduledList()
+                : filter == _Filter.topUp
+                ? const _TopUpList()
                 : list.isEmpty
                 ? _Empty(
                     text: filter == _Filter.completed
@@ -198,6 +203,25 @@ class _RideTile extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TopUpList extends ConsumerWidget {
+  const _TopUpList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final list = ref
+        .watch(walletTransactionsProvider)
+        .where((t) => t.type == WalletTxType.topUp)
+        .toList();
+    if (list.isEmpty) return const _Empty(text: 'No top ups yet');
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      itemCount: list.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (_, i) => WalletTxTile(tx: list[i]),
     );
   }
 }

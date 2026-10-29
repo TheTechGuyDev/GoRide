@@ -42,6 +42,13 @@ class Routes {
   static const scheduledDetails = '/scheduled/:id';
   static String scheduledDetailsFor(String id) => '/scheduled/$id';
 
+  // Wallet
+  static const wallet = '/wallet';
+  static const topUp = '/top-up';
+  static const topUpMethod = '/top-up-method';
+  static const topUpDetails = '/top-up-details/:id';
+  static String topUpDetailsFor(String id) => '/top-up-details/$id';
+
   // Safety
   static const emergency = '/trip/emergency';
   static const emergencyContacts = '/emergency-contacts';

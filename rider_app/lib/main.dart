@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/platform/web_insets.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
@@ -23,15 +24,17 @@ class GoRideApp extends StatelessWidget {
       themeMode: ThemeMode.light,
       routerConfig: appRouter,
       builder: (context, child) =>
-          kIsWeb ? _WebPhoneFrame(child: child!) : child!,
+          kIsWeb ? _WebPreviewFrame(child: child!) : child!,
     );
   }
 }
 
-/// On the web preview (GitHub Pages), wide screens show the app inside a
-/// phone-sized frame so it looks like the real mobile app. Phones get full width.
-class _WebPhoneFrame extends StatelessWidget {
-  const _WebPhoneFrame({required this.child});
+/// Web preview (GitHub Pages) only:
+/// - Phones: full screen, with the iPhone notch/home-bar safe areas applied
+///   so top and bottom bars are never hidden.
+/// - Laptops: the app is shown inside a phone-sized frame.
+class _WebPreviewFrame extends StatelessWidget {
+  const _WebPreviewFrame({required this.child});
 
   final Widget child;
 
@@ -40,8 +43,25 @@ class _WebPhoneFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    if (size.width <= 600) return child;
+    final mq = MediaQuery.of(context);
+    final size = mq.size;
+
+    if (size.width <= 600) {
+      final insets = readWebSafeInsets();
+      EdgeInsets merge(EdgeInsets a) => EdgeInsets.only(
+        left: a.left,
+        right: a.right,
+        top: a.top > insets.top ? a.top : insets.top,
+        bottom: a.bottom > insets.bottom ? a.bottom : insets.bottom,
+      );
+      return MediaQuery(
+        data: mq.copyWith(
+          padding: merge(mq.padding),
+          viewPadding: merge(mq.viewPadding),
+        ),
+        child: child,
+      );
+    }
 
     final height = size.height < _phoneHeight + 40
         ? size.height - 40
@@ -67,8 +87,7 @@ class _WebPhoneFrame extends StatelessWidget {
             ],
           ),
           child: MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(size: Size(_phoneWidth - 16, height - 16)),
+            data: mq.copyWith(size: Size(_phoneWidth - 16, height - 16)),
             child: child,
           ),
         ),

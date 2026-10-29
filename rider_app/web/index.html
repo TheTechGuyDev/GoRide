@@ -1,46 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="GoRide - ride hailing for Nigeria">
+  <!-- viewport-fit=cover lets us read the iPhone safe areas (notch, home bar) -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0CC25F">
 
-  <!-- iOS meta tags & icons -->
+  <!-- iOS: installable as a home-screen app -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="GoRide">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
-
   <title>GoRide</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+    /* The app lives in #app, sized to the *visible* screen (dvh excludes
+       Safari's toolbars), so bottom buttons are never hidden behind them. */
+    #app {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+    }
+    /* Invisible probe used to read env(safe-area-inset-*) from Dart. */
+    #safe-area-probe {
+      position: fixed;
+      visibility: hidden;
+      pointer-events: none;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    /* Green loading screen shown until Flutter is ready. */
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #0CC25F;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 10;
+      transition: opacity .3s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #loading img { width: 96px; height: 96px; border-radius: 22px; }
+    #loading .spin {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 4px solid rgba(255,255,255,.35); border-top-color: #fff;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <div id="safe-area-probe"></div>
+  <div id="loading">
+    <img src="icons/Icon-192.png" alt="GoRide">
+    <div class="spin"></div>
+  </div>
+  <div id="app"></div>
+  <script>
+    // Read by the Flutter app (lib/core/platform/web_insets_web.dart).
+    window.gorideSafeInsets = function () {
+      var s = getComputedStyle(document.getElementById('safe-area-probe'));
+      return [parseFloat(s.paddingTop) || 0, parseFloat(s.paddingBottom) || 0];
+    };
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

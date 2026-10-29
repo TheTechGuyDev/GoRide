@@ -20,6 +20,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: brightness,
       fontFamily: fontFamily,
+      fontFamilyFallback: const ['Naira'],
       scaffoldBackgroundColor: bg,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
@@ -44,6 +45,7 @@ class AppTheme {
         centerTitle: true,
         titleTextStyle: TextStyle(
           fontFamily: fontFamily,
+          fontFamilyFallback: const ['Naira'],
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: text,

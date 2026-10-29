@@ -19,4 +19,7 @@ class Routes {
   static const whereTo = '/where-to';
   static const setPickup = '/set-pickup';
   static const rideOptions = '/ride-options';
+  static const paymentMethod = '/payment-method';
+  static const applyPromo = '/apply-promo';
+  static const findingDriver = '/finding-driver';
 }

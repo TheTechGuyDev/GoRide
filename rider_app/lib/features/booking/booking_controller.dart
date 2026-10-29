@@ -2,12 +2,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/services/geocoding_service.dart';
+import '../../core/services/routing_service.dart';
+import '../location/location_controller.dart';
 import 'place.dart';
+import 'promos.dart';
+import 'ride_types.dart';
 
 final geocodingServiceProvider = Provider((_) => GeocodingService());
+final routingServiceProvider = Provider((_) => RoutingService());
 
 class BookingState {
-  const BookingState({this.pickup, this.destination, this.pickupNote = ''});
+  const BookingState({
+    this.pickup,
+    this.destination,
+    this.pickupNote = '',
+    this.rideTypeId = 'car',
+    this.paymentId = 'wallet',
+    this.promo,
+  });
 
   /// Null pickup means "Your current location".
   final Place? pickup;
@@ -16,20 +28,33 @@ class BookingState {
   /// Landmark guidance for the driver, e.g. "Opposite GTBank, blue gate".
   final String pickupNote;
 
+  final String rideTypeId;
+  final String paymentId;
+  final Promo? promo;
+
+  RideType get rideType => rideTypes.firstWhere((r) => r.id == rideTypeId);
+
   BookingState copyWith({
     Place? pickup,
     Place? destination,
     String? pickupNote,
+    String? rideTypeId,
+    String? paymentId,
+    Promo? promo,
+    bool clearPromo = false,
   }) {
     return BookingState(
       pickup: pickup ?? this.pickup,
       destination: destination ?? this.destination,
       pickupNote: pickupNote ?? this.pickupNote,
+      rideTypeId: rideTypeId ?? this.rideTypeId,
+      paymentId: paymentId ?? this.paymentId,
+      promo: clearPromo ? null : (promo ?? this.promo),
     );
   }
 }
 
-/// The ride being put together. Grows in Step 5 (ride type, fare, payment).
+/// The ride being put together.
 class BookingController extends Notifier<BookingState> {
   @override
   BookingState build() => const BookingState();
@@ -42,12 +67,26 @@ class BookingController extends Notifier<BookingState> {
   }
 
   void setPickupNote(String note) => state = state.copyWith(pickupNote: note);
+  void selectRideType(String id) => state = state.copyWith(rideTypeId: id);
+  void selectPayment(String id) => state = state.copyWith(paymentId: id);
+  void applyPromo(Promo p) => state = state.copyWith(promo: p);
+  void removePromo() => state = state.copyWith(clearPromo: true);
 
   void reset() => state = const BookingState();
 }
 
 final bookingControllerProvider =
     NotifierProvider<BookingController, BookingState>(BookingController.new);
+
+/// Driving route between pickup and destination (refetched when either changes).
+final bookingRouteProvider = FutureProvider<RouteInfo?>((ref) async {
+  final booking = ref.watch(bookingControllerProvider);
+  final destination = booking.destination;
+  if (destination == null) return null;
+  final from =
+      booking.pickup?.position ?? ref.read(locationControllerProvider).position;
+  return ref.read(routingServiceProvider).route(from, destination.position);
+});
 
 /// Recent destinations, seeded with popular Lagos spots.
 /// Later: read/write the rider's trip history in Supabase.

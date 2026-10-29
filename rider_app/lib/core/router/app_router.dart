@@ -5,6 +5,9 @@ import '../../features/auth/otp_screen.dart';
 import '../../features/auth/personal_info_screen.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/sign_up_screen.dart';
+import '../../features/booking/payment_method_screen.dart';
+import '../../features/booking/promos_screen.dart';
+import '../../features/booking/ride_options_screen.dart';
 import '../../features/booking/set_pickup_screen.dart';
 import '../../features/booking/where_to_screen.dart';
 import '../../features/home/home_shell.dart';
@@ -46,8 +49,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: Routes.promos,
-              builder: (_, _) =>
-                  const ComingSoonTab(title: 'Promos', icon: Icons.local_offer),
+              builder: (_, _) => const PromosScreen(),
             ),
           ],
         ),
@@ -85,13 +87,28 @@ final appRouter = GoRouter(
       parentNavigatorKey: _rootKey,
       builder: (_, _) => const SetPickupScreen(),
     ),
-    // Built in Step 5 (ride options & fares).
     GoRoute(
       path: Routes.rideOptions,
       parentNavigatorKey: _rootKey,
+      builder: (_, _) => const RideOptionsScreen(),
+    ),
+    GoRoute(
+      path: Routes.paymentMethod,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const PaymentMethodScreen(),
+    ),
+    GoRoute(
+      path: Routes.applyPromo,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const PromosScreen(applying: true),
+    ),
+    // Built in Step 6 (driver matching & live trip).
+    GoRoute(
+      path: Routes.findingDriver,
+      parentNavigatorKey: _rootKey,
       builder: (_, _) => const ComingSoonTab(
-        title: 'Choose your ride',
-        icon: Icons.directions_car,
+        title: 'Finding a driver',
+        icon: Icons.local_taxi,
       ),
     ),
   ],

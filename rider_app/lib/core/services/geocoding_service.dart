@@ -43,10 +43,19 @@ class GeocodingService {
     if (res.statusCode != 200) return [];
 
     final list = jsonDecode(res.body) as List<dynamic>;
-    return list
+    final places = list
         .map((e) => _fromNominatim(e as Map<String, dynamic>))
         .whereType<Place>()
         .toList();
+
+    // OSM rarely has Nigerian house numbers, so "27, Ajileye" only matches
+    // "Ajileye Street". Keep the number the rider typed on street results.
+    final number = RegExp(r'^(\d+[A-Za-z]?)[,\s]+').firstMatch(q)?.group(1);
+    if (number == null) return places;
+    return places.map((p) {
+      if (RegExp(r'^\d').hasMatch(p.name)) return p;
+      return p.copyWith(name: '$number ${p.name}');
+    }).toList();
   }
 
   /// Address for a map point (used when dragging the pickup pin).

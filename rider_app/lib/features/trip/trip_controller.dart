@@ -22,6 +22,22 @@ class TripController extends Notifier<TripState?> {
   final _rand = Random();
   Timer? _timer;
   Timer? _ticker;
+  Timer? _alertTimer;
+
+  // --- Route safety monitor ---
+  /// How far from the agreed route counts as "off route".
+  static const offRouteMetres = 300.0;
+
+  /// How long the driver must stay off route before the rider is alerted.
+  /// Production: 45s, so short detours and U-turns don't cause alarms.
+  /// Preview: shorter so it can be tested quickly.
+  static const offRouteConfirm = Duration(seconds: 6);
+
+  /// Rider has this long to answer before SOS is sent automatically.
+  static const alertTimeout = Duration(seconds: 60);
+
+  /// After this long without an answer: loud alarm + final countdown.
+  static const alertEscalateAfter = Duration(seconds: 45);
 
   // Preview speeds (real trips take as long as the road says).
   static const _searchTime = Duration(seconds: 5);
@@ -39,6 +55,7 @@ class TripController extends Notifier<TripState?> {
   void _stopTimers() {
     _timer?.cancel();
     _ticker?.cancel();
+    _alertTimer?.cancel();
   }
 
   /// Called from "Book" on the ride options screen.
@@ -110,6 +127,7 @@ class TripController extends Notifier<TripState?> {
     List<LatLng> points,
     Duration duration, {
     required void Function() onDone,
+    void Function(LatLng position)? onMove,
   }) {
     _ticker?.cancel();
     final steps = duration.inMilliseconds / _tick.inMilliseconds;
@@ -123,6 +141,7 @@ class TripController extends Notifier<TripState?> {
         driverPosition: pos.point,
         driverHeading: pos.heading,
       );
+      onMove?.call(pos.point);
       if (next >= 1) {
         t.cancel();
         onDone();
@@ -154,7 +173,160 @@ class TripController extends Notifier<TripState?> {
       driverPosition: first.point,
       driverHeading: first.heading,
     );
-    _runLeg(s.tripRoute.points, _tripTime, onDone: _complete);
+    _runLeg(
+      s.tripRoute.points,
+      _tripTime,
+      onDone: _complete,
+      onMove: _checkRoute,
+    );
+  }
+
+  // --- Route safety monitor ---
+
+  /// Runs on every driver position update during the ride.
+  /// With the backend this check also runs on the server, so an alert still
+  /// fires if the rider's phone is off, stolen or out of data.
+  void _checkRoute(LatLng position) {
+    final s = state;
+    if (s == null || s.phase != TripPhase.onTrip) return;
+    if (s.routeAlert != null || s.emergency != null) return;
+
+    final off = distanceToPath(position, s.tripRoute.points) > offRouteMetres;
+    if (!off) {
+      if (s.offRouteSince != null) state = s.copyWith(clearOffRoute: true);
+      return;
+    }
+    final since = s.offRouteSince ?? DateTime.now();
+    if (s.offRouteSince == null) state = s.copyWith(offRouteSince: since);
+    if (DateTime.now().difference(since) >= offRouteConfirm) _raiseRouteAlert();
+  }
+
+  void _raiseRouteAlert() {
+    final s = state;
+    if (s == null) return;
+    final now = DateTime.now();
+    state = s.copyWith(
+      routeAlert: RouteAlert(startedAt: now, deadline: now.add(alertTimeout)),
+    );
+    _alertTimer?.cancel();
+    _alertTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final a = state?.routeAlert;
+      if (a == null) return _alertTimer?.cancel();
+      final now = DateTime.now();
+      if (!now.isBefore(a.deadline)) {
+        triggerSos(
+          automatic: true,
+          reason: 'Driver left the route and the rider did not respond',
+        );
+        return;
+      }
+      final escalateAt = a.deadline.subtract(alertTimeout - alertEscalateAfter);
+      if (a.stage == RouteAlertStage.asking && !now.isBefore(escalateAt)) {
+        state = state!.copyWith(
+          routeAlert: a.copyWith(stage: RouteAlertStage.escalated),
+        );
+      }
+    });
+  }
+
+  /// "I know this route": accept the driver's new route and keep going.
+  Future<void> acceptNewRoute() async {
+    final s = state;
+    if (s == null || s.driverPosition == null) return;
+    _alertTimer?.cancel();
+    state = s.copyWith(clearRouteAlert: true, clearOffRoute: true);
+
+    final newRoute = await ref
+        .read(routingServiceProvider)
+        .route(s.driverPosition!, s.destination.position);
+    final now = state;
+    if (now == null || now.phase != TripPhase.onTrip) return;
+    state = now.copyWith(
+      tripRoute: newRoute,
+      clearDrivePath: true,
+      progress: 0,
+      reroutedCount: now.reroutedCount + 1,
+    );
+    _runLeg(
+      newRoute.points,
+      _tripTime * 0.6,
+      onDone: _complete,
+      onMove: _checkRoute,
+    );
+  }
+
+  /// "Ask driver": message the driver and get one more minute to decide.
+  void askDriverAboutRoute() {
+    final s = state;
+    final a = s?.routeAlert;
+    if (s == null || a == null) return;
+    state = s.copyWith(
+      routeAlert: a.copyWith(
+        askedDriver: true,
+        stage: RouteAlertStage.asking,
+        deadline: DateTime.now().add(alertTimeout),
+      ),
+      messages: [
+        ...s.messages,
+        ChatMessage(
+          text: 'Why are we going a different way from the route on my app?',
+          fromRider: true,
+          time: DateTime.now(),
+        ),
+      ],
+    );
+    Timer(const Duration(seconds: 3), () {
+      _driverSays(
+        'Sorry, the main road is blocked with heavy traffic. '
+        "I'm taking another way, we'll still get there.",
+      );
+    });
+  }
+
+  /// SOS: alert next of kin + GoRide safety team with live location.
+  void triggerSos({required bool automatic, required String reason}) {
+    final s = state;
+    if (s == null || s.emergency != null) return;
+    _alertTimer?.cancel();
+    state = s.copyWith(
+      clearRouteAlert: true,
+      emergency: Emergency(
+        triggeredAt: DateTime.now(),
+        automatic: automatic,
+        reason: reason,
+      ),
+    );
+  }
+
+  /// Rider confirms they are safe; ends emergency mode.
+  void markSafe() {
+    final s = state;
+    if (s == null) return;
+    state = s.copyWith(clearEmergency: true, clearOffRoute: true);
+    // Continue to the destination from wherever the car is now.
+    if (s.drivePath != null && s.phase == TripPhase.onTrip) acceptNewRoute();
+  }
+
+  /// Preview only: make the driver take a wrong turn to test the alert.
+  void simulateWrongTurn() {
+    final s = state;
+    final pos = s?.driverPosition;
+    if (s == null || pos == null || s.phase != TripPhase.onTrip) return;
+    if (s.routeAlert != null || s.emergency != null) return;
+
+    // Turn sideways (not backwards along the same road) so it's clearly off route.
+    final away = (bearingBetween(pos, s.destination.position) + 100) % 360;
+    final p1 = offsetPoint(pos, 150, (away + 60) % 360);
+    final p2 = offsetPoint(p1, 900, away);
+    final p3 = offsetPoint(p2, 1400, (away + 25) % 360);
+    final path = [pos, p1, p2, p3];
+    state = s.copyWith(drivePath: path, progress: 0);
+    _runLeg(
+      path,
+      const Duration(seconds: 70),
+      onDone: () {},
+      onMove: _checkRoute,
+    );
   }
 
   void _complete() {

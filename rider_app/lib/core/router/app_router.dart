@@ -11,6 +11,8 @@ import '../../features/booking/ride_options_screen.dart';
 import '../../features/booking/set_pickup_screen.dart';
 import '../../features/booking/where_to_screen.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/safety/emergency_contacts.dart';
+import '../../features/safety/emergency_screen.dart';
 import '../../features/trip/call_screen.dart';
 import '../../features/trip/cancel_ride_screen.dart';
 import '../../features/trip/chat_screen.dart';
@@ -133,7 +135,17 @@ final appRouter = GoRouter(
           parentNavigatorKey: _rootKey,
           builder: (_, _) => const CancelRideScreen(),
         ),
+        GoRoute(
+          path: 'emergency',
+          parentNavigatorKey: _rootKey,
+          builder: (_, _) => const EmergencyScreen(),
+        ),
       ],
+    ),
+    GoRoute(
+      path: Routes.emergencyContacts,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const EmergencyContactsScreen(),
     ),
     GoRoute(
       path: Routes.rideCanceled,

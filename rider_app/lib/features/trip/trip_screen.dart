@@ -20,6 +20,7 @@ import 'path_utils.dart';
 import 'trip_controller.dart';
 import 'trip_models.dart';
 import 'widgets/trip_widgets.dart';
+import '../safety/route_alert_overlay.dart';
 
 /// Screens 26-28 and 33: finding a driver, driver on the way, PIN at
 /// pickup, and heading to the destination, all on one live map.
@@ -37,6 +38,7 @@ class _TripScreenState extends ConsumerState<TripScreen> {
   bool _userMovedMap = false;
   TripPhase? _lastPhase;
   Timer? _follow;
+  final _sound = AlertSound();
 
   @override
   void initState() {
@@ -50,6 +52,7 @@ class _TripScreenState extends ConsumerState<TripScreen> {
   @override
   void dispose() {
     _follow?.cancel();
+    _sound.dispose();
     super.dispose();
   }
 
@@ -217,11 +220,33 @@ class _TripScreenState extends ConsumerState<TripScreen> {
     }
     _onPhaseChange(trip);
 
+    // Alarm + bring the rider back to this screen when safety events happen.
+    ref.listen(tripControllerProvider, (prev, next) {
+      final hadAlert = prev?.routeAlert != null;
+      final alert = next?.routeAlert;
+      if (alert != null && !hadAlert) {
+        context.go(Routes.trip);
+        _sound.start();
+      } else if (alert != null &&
+          alert.stage == RouteAlertStage.escalated &&
+          prev?.routeAlert?.stage != RouteAlertStage.escalated) {
+        _sound.start(loud: true);
+      } else if (alert == null && hadAlert && next?.emergency == null) {
+        _sound.stop();
+      }
+      if (next?.emergency != null && prev?.emergency == null) {
+        _sound.start(loud: true);
+        Future.delayed(const Duration(seconds: 4), _sound.stop);
+        context.push(Routes.emergency);
+      }
+    });
+
     final path = switch (trip.phase) {
       TripPhase.driverEnRoute when trip.approachRoute != null => remainingPath(
         trip.approachRoute!.points,
         trip.progress,
       ),
+      TripPhase.onTrip when trip.drivePath != null => trip.tripRoute.points,
       TripPhase.onTrip => remainingPath(trip.tripRoute.points, trip.progress),
       _ => <LatLng>[],
     };
@@ -229,167 +254,257 @@ class _TripScreenState extends ConsumerState<TripScreen> {
     final showDriver =
         trip.driverPosition != null && trip.phase != TripPhase.searching;
 
+    final offRoutePath = trip.drivePath == null
+        ? const <LatLng>[]
+        : travelledPath(trip.drivePath!, trip.progress);
+
     return PopScope(
       canPop: false,
-      child: Scaffold(
-        body: Column(
-          children: [
-            Expanded(
-              child: Stack(
-                children: [
-                  FlutterMap(
-                    mapController: _map,
-                    options: MapOptions(
-                      initialCenter: trip.pickup,
-                      initialZoom: 16,
-                      onMapReady: () {
-                        _mapReady = true;
-                        _fitCamera();
-                      },
-                      onPositionChanged: (_, hasGesture) {
-                        if (hasGesture) _userMovedMap = true;
-                      },
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                      ),
-                    ),
+      child: Stack(
+        children: [
+          Scaffold(
+            body: Column(
+              children: [
+                Expanded(
+                  child: Stack(
                     children: [
-                      TileLayer(
-                        urlTemplate: MapConfig.tileUrl,
-                        userAgentPackageName: MapConfig.userAgent,
-                      ),
-                      if (path.length >= 2)
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: path,
-                              strokeWidth: 5,
-                              color: AppColors.primary,
-                              borderStrokeWidth: 1.5,
-                              borderColor: AppColors.primaryDark,
-                            ),
-                          ],
+                      FlutterMap(
+                        mapController: _map,
+                        options: MapOptions(
+                          initialCenter: trip.pickup,
+                          initialZoom: 16,
+                          onMapReady: () {
+                            _mapReady = true;
+                            _fitCamera();
+                          },
+                          onPositionChanged: (_, hasGesture) {
+                            if (hasGesture) _userMovedMap = true;
+                          },
+                          interactionOptions: const InteractionOptions(
+                            flags:
+                                InteractiveFlag.all & ~InteractiveFlag.rotate,
+                          ),
                         ),
-                      if (trip.phase == TripPhase.searching)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: trip.pickup,
-                              width: 260,
-                              height: 260,
-                              child: PulseRings(
-                                child: CircleAvatar(
-                                  radius: 34,
-                                  backgroundColor: Colors.white,
-                                  child: CircleAvatar(
-                                    radius: 30,
-                                    backgroundColor: AppColors.primaryLight,
-                                    backgroundImage: photo != null
-                                        ? MemoryImage(photo)
-                                        : null,
-                                    child: photo == null
-                                        ? const Icon(
-                                            Icons.person,
-                                            color: AppColors.primary,
-                                            size: 30,
-                                          )
-                                        : null,
+                        children: [
+                          TileLayer(
+                            urlTemplate: MapConfig.tileUrl,
+                            userAgentPackageName: MapConfig.userAgent,
+                          ),
+                          if (path.length >= 2)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: path,
+                                  strokeWidth: 5,
+                                  color: AppColors.primary,
+                                  borderStrokeWidth: 1.5,
+                                  borderColor: AppColors.primaryDark,
+                                ),
+                              ],
+                            ),
+                          if (offRoutePath.length >= 2)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: offRoutePath,
+                                  strokeWidth: 5,
+                                  color: AppColors.error,
+                                  pattern: StrokePattern.dashed(
+                                    segments: const [10, 6],
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
-                        )
-                      else
-                        MarkerLayer(
-                          markers: [
-                            if (trip.phase != TripPhase.onTrip)
-                              Marker(
-                                point: trip.pickup,
-                                width: UserPinMarker.width,
-                                height: UserPinMarker.height,
-                                alignment: Alignment.topCenter,
-                                child: UserPinMarker(photo: photo),
-                              ),
-                            if (showDestination)
-                              Marker(
-                                point: trip.destination.position,
-                                width: 48,
-                                height: 48,
-                                alignment: Alignment.topCenter,
-                                child: const Icon(
-                                  Icons.location_on,
-                                  size: 48,
-                                  color: AppColors.error,
+                          if (trip.phase == TripPhase.searching)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: trip.pickup,
+                                  width: 260,
+                                  height: 260,
+                                  child: PulseRings(
+                                    child: CircleAvatar(
+                                      radius: 34,
+                                      backgroundColor: Colors.white,
+                                      child: CircleAvatar(
+                                        radius: 30,
+                                        backgroundColor: AppColors.primaryLight,
+                                        backgroundImage: photo != null
+                                            ? MemoryImage(photo)
+                                            : null,
+                                        child: photo == null
+                                            ? const Icon(
+                                                Icons.person,
+                                                color: AppColors.primary,
+                                                size: 30,
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            if (showDriver)
-                              Marker(
-                                point: trip.driverPosition!,
-                                width: 48,
-                                height: 48,
-                                child: VehicleMarker(
-                                  heading: trip.driverHeading,
-                                  type: trip.rideType.kind == VehicleKind.bike
-                                      ? VehicleType.bike
-                                      : VehicleType.car,
-                                ),
-                              ),
-                          ],
-                        ),
-                    ],
-                  ),
-                  Positioned(
-                    top: MediaQuery.paddingOf(context).top + 12,
-                    left: 16,
-                    right: 16,
-                    child: _TripCard(trip: trip),
-                  ),
-                  if (trip.driver != null)
-                    Positioned(
-                      top: MediaQuery.paddingOf(context).top + 116,
-                      right: 16,
-                      child: Column(
-                        children: [
-                          _MapButton(
-                            icon: Icons.shield,
-                            color: AppColors.error,
-                            tooltip: 'Safety',
-                            onTap: () => showSafetySheet(context, trip),
-                          ),
-                          const SizedBox(height: 10),
-                          _MapButton(
-                            icon: Icons.share_location,
-                            color: AppColors.primary,
-                            tooltip: 'Share trip',
-                            onTap: () => shareTrip(context, trip),
-                          ),
+                              ],
+                            )
+                          else
+                            MarkerLayer(
+                              markers: [
+                                if (trip.phase != TripPhase.onTrip)
+                                  Marker(
+                                    point: trip.pickup,
+                                    width: UserPinMarker.width,
+                                    height: UserPinMarker.height,
+                                    alignment: Alignment.topCenter,
+                                    child: UserPinMarker(photo: photo),
+                                  ),
+                                if (showDestination)
+                                  Marker(
+                                    point: trip.destination.position,
+                                    width: 48,
+                                    height: 48,
+                                    alignment: Alignment.topCenter,
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      size: 48,
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                if (showDriver)
+                                  Marker(
+                                    point: trip.driverPosition!,
+                                    width: 48,
+                                    height: 48,
+                                    child: VehicleMarker(
+                                      heading: trip.driverHeading,
+                                      type:
+                                          trip.rideType.kind == VehicleKind.bike
+                                          ? VehicleType.bike
+                                          : VehicleType.car,
+                                    ),
+                                  ),
+                              ],
+                            ),
                         ],
                       ),
-                    ),
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: _MapButton(
-                      icon: Icons.my_location,
-                      color: AppColors.textPrimary,
-                      tooltip: 'Follow',
-                      onTap: () {
-                        _userMovedMap = false;
-                        _fitCamera();
-                      },
-                    ),
+                      Positioned(
+                        top: MediaQuery.paddingOf(context).top + 12,
+                        left: 16,
+                        right: 16,
+                        child: trip.emergency != null
+                            ? _EmergencyBanner(
+                                onTap: () => context.push(Routes.emergency),
+                              )
+                            : _TripCard(trip: trip),
+                      ),
+                      if (trip.driver != null)
+                        Positioned(
+                          top: MediaQuery.paddingOf(context).top + 116,
+                          right: 16,
+                          child: Column(
+                            children: [
+                              _MapButton(
+                                icon: Icons.shield,
+                                color: AppColors.error,
+                                tooltip: 'Safety',
+                                onTap: () => showSafetySheet(
+                                  context,
+                                  trip,
+                                  onSos: () => ref
+                                      .read(tripControllerProvider.notifier)
+                                      .triggerSos(
+                                        automatic: false,
+                                        reason: 'Rider pressed SOS',
+                                      ),
+                                  onEmergencyContacts: () =>
+                                      context.push(Routes.emergencyContacts),
+                                  onTestRouteAlert:
+                                      trip.phase == TripPhase.onTrip &&
+                                          trip.routeAlert == null &&
+                                          trip.emergency == null &&
+                                          trip.drivePath == null
+                                      ? ref
+                                            .read(
+                                              tripControllerProvider.notifier,
+                                            )
+                                            .simulateWrongTurn
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _MapButton(
+                                icon: Icons.share_location,
+                                color: AppColors.primary,
+                                tooltip: 'Share trip',
+                                onTap: () => shareTrip(context, trip),
+                              ),
+                            ],
+                          ),
+                        ),
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: _MapButton(
+                          icon: Icons.my_location,
+                          color: AppColors.textPrimary,
+                          tooltip: 'Follow',
+                          onTap: () {
+                            _userMovedMap = false;
+                            _fitCamera();
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+                _Panel(
+                  trip: trip,
+                  showDetails: _showDetails,
+                  onToggleDetails: () =>
+                      setState(() => _showDetails = !_showDetails),
+                ),
+              ],
+            ),
+          ),
+          if (trip.routeAlert != null)
+            Positioned.fill(
+              child: RouteAlertOverlay(alert: trip.routeAlert!, trip: trip),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmergencyBanner extends StatelessWidget {
+  const _EmergencyBanner({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.error,
+      elevation: 4,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(Icons.emergency_share, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'EMERGENCY MODE: your contacts can see your live location. Tap for options.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    height: 1.3,
+                  ),
+                ),
               ),
-            ),
-            _Panel(
-              trip: trip,
-              showDetails: _showDetails,
-              onToggleDetails: () =>
-                  setState(() => _showDetails = !_showDetails),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -427,6 +542,10 @@ class _Panel extends ConsumerWidget {
       TripPhase.driverArrived => (
         'Your driver has arrived',
         'Check the plate number, then share your PIN to start the ride',
+      ),
+      TripPhase.onTrip when trip.drivePath != null => (
+        'Off the planned route',
+        'GoRide is watching this trip',
       ),
       TripPhase.onTrip => (
         'Heading to destination...',

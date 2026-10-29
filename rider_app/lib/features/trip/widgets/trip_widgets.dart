@@ -177,9 +177,16 @@ Future<void> shareTrip(BuildContext context, TripState trip) async {
 }
 
 /// SOS / safety tools sheet.
-Future<void> showSafetySheet(BuildContext context, TripState trip) {
+Future<void> showSafetySheet(
+  BuildContext context,
+  TripState trip, {
+  VoidCallback? onSos,
+  VoidCallback? onEmergencyContacts,
+  VoidCallback? onTestRouteAlert,
+}) {
   return showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -187,62 +194,100 @@ Future<void> showSafetySheet(BuildContext context, TripState trip) {
     builder: (ctx) => SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.shield, color: AppColors.primary),
-                SizedBox(width: 8),
-                Text(
-                  'Safety tools',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.shield, color: AppColors.primary),
+                  SizedBox(width: 8),
+                  Text(
+                    'Safety tools',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                trip.driver == null
+                    ? 'Trip ${trip.id}'
+                    : '${trip.driver!.name} · ${trip.driver!.plate} · Trip ${trip.id}',
+                style: const TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              if (onSos != null)
+                _SafetyTile(
+                  icon: Icons.notification_important,
+                  color: AppColors.error,
+                  title: 'SOS: alert my emergency contacts',
+                  subtitle:
+                      'Sends your live location to next of kin and GoRide',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onSos();
+                  },
+                ),
+              _SafetyTile(
+                icon: Icons.sos,
+                color: AppColors.error,
+                title: 'Call emergency services (112)',
+                subtitle: 'Nigeria\'s free emergency number',
+                onTap: () => launchUrl(Uri(scheme: 'tel', path: '112')),
+              ),
+              _SafetyTile(
+                icon: Icons.share_location,
+                color: AppColors.primary,
+                title: 'Share trip status',
+                subtitle: 'Send driver, car and live position to someone',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  shareTrip(context, trip);
+                },
+              ),
+              _SafetyTile(
+                icon: Icons.report_outlined,
+                color: AppColors.warning,
+                title: 'Report a safety issue',
+                subtitle: 'Our safety team reviews every report',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Safety reports go to the GoRide team once the backend is live',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              if (onEmergencyContacts != null)
+                _SafetyTile(
+                  icon: Icons.contacts_outlined,
+                  color: AppColors.primary,
+                  title: 'Emergency contacts',
+                  subtitle: 'Who gets alerted if something goes wrong',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onEmergencyContacts();
+                  },
+                ),
+              if (onTestRouteAlert != null) ...[
+                const Divider(height: 24),
+                _SafetyTile(
+                  icon: Icons.alt_route,
+                  color: const Color(0xFF6A1B9A),
+                  title: 'Test route alert (preview only)',
+                  subtitle: 'Makes the driver take a wrong turn',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onTestRouteAlert();
+                  },
                 ),
               ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              trip.driver == null
-                  ? 'Trip ${trip.id}'
-                  : '${trip.driver!.name} · ${trip.driver!.plate} · Trip ${trip.id}',
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            _SafetyTile(
-              icon: Icons.sos,
-              color: AppColors.error,
-              title: 'Call emergency services (112)',
-              subtitle: 'Nigeria\'s free emergency number',
-              onTap: () => launchUrl(Uri(scheme: 'tel', path: '112')),
-            ),
-            _SafetyTile(
-              icon: Icons.share_location,
-              color: AppColors.primary,
-              title: 'Share trip status',
-              subtitle: 'Send driver, car and live position to someone',
-              onTap: () {
-                Navigator.pop(ctx);
-                shareTrip(context, trip);
-              },
-            ),
-            _SafetyTile(
-              icon: Icons.report_outlined,
-              color: AppColors.warning,
-              title: 'Report a safety issue',
-              subtitle: 'Our safety team reviews every report',
-              onTap: () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Safety reports go to the GoRide team once the backend is live',
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),

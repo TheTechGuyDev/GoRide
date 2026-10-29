@@ -72,6 +72,59 @@ class ChatMessage {
   final DateTime time;
 }
 
+enum RouteAlertStage {
+  /// Driver left the route; rider has 60s to respond.
+  asking,
+
+  /// 45s passed with no answer: loud alarm, final countdown.
+  escalated,
+}
+
+/// Raised when the driver goes off the agreed route.
+class RouteAlert {
+  const RouteAlert({
+    required this.startedAt,
+    required this.deadline,
+    this.stage = RouteAlertStage.asking,
+    this.askedDriver = false,
+  });
+
+  final DateTime startedAt;
+
+  /// When SOS fires automatically if the rider hasn't answered.
+  final DateTime deadline;
+  final RouteAlertStage stage;
+  final bool askedDriver;
+
+  RouteAlert copyWith({
+    DateTime? deadline,
+    RouteAlertStage? stage,
+    bool? askedDriver,
+  }) {
+    return RouteAlert(
+      startedAt: startedAt,
+      deadline: deadline ?? this.deadline,
+      stage: stage ?? this.stage,
+      askedDriver: askedDriver ?? this.askedDriver,
+    );
+  }
+}
+
+/// Emergency mode: next of kin + GoRide safety team alerted.
+class Emergency {
+  const Emergency({
+    required this.triggeredAt,
+    required this.automatic,
+    required this.reason,
+  });
+
+  final DateTime triggeredAt;
+
+  /// True when fired by the 60-second timeout, not the rider.
+  final bool automatic;
+  final String reason;
+}
+
 class TripState {
   const TripState({
     required this.id,
@@ -96,6 +149,11 @@ class TripState {
     this.startedAt,
     this.endedAt,
     this.cancelReason,
+    this.drivePath,
+    this.offRouteSince,
+    this.routeAlert,
+    this.emergency,
+    this.reroutedCount = 0,
   });
 
   final String id;
@@ -129,6 +187,18 @@ class TripState {
   final DateTime? endedAt;
   final String? cancelReason;
 
+  /// The path the car is actually driving (differs from [tripRoute] when
+  /// the driver deviates). Null = following [tripRoute].
+  final List<LatLng>? drivePath;
+
+  /// When the driver was first seen off the agreed route.
+  final DateTime? offRouteSince;
+  final RouteAlert? routeAlert;
+  final Emergency? emergency;
+
+  /// How many times the rider accepted a new route.
+  final int reroutedCount;
+
   int get total => fare - discount;
 
   /// Minutes left on the current leg, based on the real route time.
@@ -151,6 +221,16 @@ class TripState {
     DateTime? startedAt,
     DateTime? endedAt,
     String? cancelReason,
+    RouteInfo? tripRoute,
+    List<LatLng>? drivePath,
+    bool clearDrivePath = false,
+    DateTime? offRouteSince,
+    bool clearOffRoute = false,
+    RouteAlert? routeAlert,
+    bool clearRouteAlert = false,
+    Emergency? emergency,
+    bool clearEmergency = false,
+    int? reroutedCount,
   }) {
     return TripState(
       id: id,
@@ -163,7 +243,7 @@ class TripState {
       paymentId: paymentId,
       fare: fare,
       discount: discount,
-      tripRoute: tripRoute,
+      tripRoute: tripRoute ?? this.tripRoute,
       pin: pin,
       driver: driver ?? this.driver,
       approachRoute: approachRoute ?? this.approachRoute,
@@ -175,6 +255,13 @@ class TripState {
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       cancelReason: cancelReason ?? this.cancelReason,
+      drivePath: clearDrivePath ? null : (drivePath ?? this.drivePath),
+      offRouteSince: clearOffRoute
+          ? null
+          : (offRouteSince ?? this.offRouteSince),
+      routeAlert: clearRouteAlert ? null : (routeAlert ?? this.routeAlert),
+      emergency: clearEmergency ? null : (emergency ?? this.emergency),
+      reroutedCount: reroutedCount ?? this.reroutedCount,
     );
   }
 }

@@ -19,6 +19,7 @@ class BookingState {
     this.rideTypeId = 'car',
     this.paymentId = 'wallet',
     this.promo,
+    this.scheduledAt,
   });
 
   /// Null pickup means "Your current location".
@@ -32,6 +33,9 @@ class BookingState {
   final String paymentId;
   final Promo? promo;
 
+  /// Null = ride now.
+  final DateTime? scheduledAt;
+
   RideType get rideType => rideTypes.firstWhere((r) => r.id == rideTypeId);
 
   BookingState copyWith({
@@ -42,6 +46,8 @@ class BookingState {
     String? paymentId,
     Promo? promo,
     bool clearPromo = false,
+    DateTime? scheduledAt,
+    bool clearSchedule = false,
   }) {
     return BookingState(
       pickup: pickup ?? this.pickup,
@@ -50,6 +56,7 @@ class BookingState {
       rideTypeId: rideTypeId ?? this.rideTypeId,
       paymentId: paymentId ?? this.paymentId,
       promo: clearPromo ? null : (promo ?? this.promo),
+      scheduledAt: clearSchedule ? null : (scheduledAt ?? this.scheduledAt),
     );
   }
 }
@@ -71,6 +78,11 @@ class BookingController extends Notifier<BookingState> {
   void selectPayment(String id) => state = state.copyWith(paymentId: id);
   void applyPromo(Promo p) => state = state.copyWith(promo: p);
   void removePromo() => state = state.copyWith(clearPromo: true);
+  void setSchedule(DateTime at) => state = state.copyWith(scheduledAt: at);
+  void clearSchedule() => state = state.copyWith(clearSchedule: true);
+
+  /// Restores a booking (used when a scheduled ride starts).
+  void load(BookingState b) => state = b;
 
   void reset() => state = const BookingState();
 }

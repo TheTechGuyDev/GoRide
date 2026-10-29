@@ -12,7 +12,10 @@ import '../../core/widgets/app_button.dart';
 import '../auth/auth_controller.dart';
 import '../home/widgets/map_markers.dart';
 import '../location/location_controller.dart';
+import '../schedule/schedule_sheet.dart';
+import '../schedule/scheduled_rides.dart';
 import '../trip/trip_controller.dart';
+import '../../core/utils/dates.dart';
 import 'booking_controller.dart';
 import 'payment_methods.dart';
 import 'ride_types.dart';
@@ -63,6 +66,11 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
           ),
         ),
       );
+      return;
+    }
+    if (booking.scheduledAt != null) {
+      final ride = ref.read(scheduledRidesProvider.notifier).schedule(route);
+      context.go(Routes.schedulingFor(ride.id));
       return;
     }
     ref.read(tripControllerProvider.notifier).start(route);
@@ -366,32 +374,67 @@ class _OptionsPanel extends ConsumerWidget {
                 children: [
                   InkWell(
                     customBorder: const CircleBorder(),
-                    onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Scheduled rides come in a later step'),
-                      ),
-                    ),
+                    onTap: () async {
+                      final choice = await showScheduleSheet(
+                        context,
+                        current: booking.scheduledAt,
+                      );
+                      if (choice == null) return;
+                      final b = ref.read(bookingControllerProvider.notifier);
+                      if (choice.at == null) {
+                        b.clearSchedule();
+                      } else {
+                        b.setSchedule(choice.at!);
+                      }
+                    },
                     child: Container(
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        color: booking.scheduledAt != null
+                            ? AppColors.primaryLight
+                            : null,
                         border: Border.all(
                           color: AppColors.primary,
                           width: 1.5,
                         ),
                       ),
-                      child: const Icon(
-                        Icons.calendar_month_outlined,
-                        color: AppColors.primary,
-                      ),
+                      child: booking.scheduledAt == null
+                          ? const Icon(
+                              Icons.calendar_month_outlined,
+                              color: AppColors.primary,
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  formatDate(booking.scheduledAt!)
+                                      .split(',')
+                                      .first,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                Text(
+                                  formatTime(booking.scheduledAt!),
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: AppButton(
                       label:
-                          'Book ${booking.rideType.name} · ${naira(selectedFare - selectedDiscount)}',
+                          '${booking.scheduledAt == null ? 'Book' : 'Schedule'} ${booking.rideType.name} · ${naira(selectedFare - selectedDiscount)}',
                       onPressed: onBook,
                     ),
                   ),

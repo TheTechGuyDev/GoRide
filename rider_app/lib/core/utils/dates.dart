@@ -27,10 +27,11 @@ String formatDateTimeShort(DateTime d) {
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(d.year, d.month, d.day);
   final diff = today.difference(day).inDays;
-  final label = diff == 0
-      ? 'Today'
-      : diff == 1
-      ? 'Yesterday'
-      : formatDate(d);
+  final label = switch (diff) {
+    0 => 'Today',
+    1 => 'Yesterday',
+    -1 => 'Tomorrow',
+    _ => formatDate(d),
+  };
   return '$label · ${formatTime(d)}';
 }

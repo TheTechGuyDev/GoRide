@@ -36,6 +36,12 @@ class Routes {
   static const rideDetails = '/ride/:id';
   static String rideDetailsFor(String id) => '/ride/$id';
 
+  // Scheduled rides
+  static const scheduling = '/scheduling/:id';
+  static String schedulingFor(String id) => '/scheduling/$id';
+  static const scheduledDetails = '/scheduled/:id';
+  static String scheduledDetailsFor(String id) => '/scheduled/$id';
+
   // Safety
   static const emergency = '/trip/emergency';
   static const emergencyContacts = '/emergency-contacts';

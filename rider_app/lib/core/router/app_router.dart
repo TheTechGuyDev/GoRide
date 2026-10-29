@@ -13,6 +13,8 @@ import '../../features/booking/where_to_screen.dart';
 import '../../features/activity/activity_tab.dart';
 import '../../features/activity/ride_details_screen.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/schedule/scheduled_ride_details_screen.dart';
+import '../../features/schedule/scheduling_screen.dart';
 import '../../features/trip/rate_driver_screen.dart';
 import '../../features/safety/emergency_contacts.dart';
 import '../../features/safety/emergency_screen.dart';
@@ -141,6 +143,18 @@ final appRouter = GoRouter(
           builder: (_, _) => const EmergencyScreen(),
         ),
       ],
+    ),
+    GoRoute(
+      path: Routes.scheduling,
+      parentNavigatorKey: _rootKey,
+      builder: (_, state) =>
+          SchedulingScreen(rideId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: Routes.scheduledDetails,
+      parentNavigatorKey: _rootKey,
+      builder: (_, state) =>
+          ScheduledRideDetailsScreen(rideId: state.pathParameters['id']!),
     ),
     GoRoute(
       path: Routes.emergencyContacts,

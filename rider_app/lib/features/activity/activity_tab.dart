@@ -9,9 +9,10 @@ import '../../core/utils/money.dart';
 import '../booking/payment_methods.dart';
 import '../trip/trip_controller.dart';
 import '../trip/trip_models.dart';
+import '../schedule/scheduled_rides.dart';
 import 'ride_history.dart';
 
-enum _Filter { ongoing, completed, canceled }
+enum _Filter { ongoing, scheduled, completed, canceled }
 
 /// Screens 51, 56, 59: ride history.
 class ActivityTab extends ConsumerStatefulWidget {
@@ -68,6 +69,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                     child: ChoiceChip(
                       label: Text(switch (f) {
                         _Filter.ongoing => 'Ongoing',
+                        _Filter.scheduled => 'Scheduled',
                         _Filter.completed => 'Completed',
                         _Filter.canceled => 'Canceled',
                       }),
@@ -97,6 +99,8 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
           Expanded(
             child: filter == _Filter.ongoing
                 ? _OngoingView(trip: ongoing)
+                : filter == _Filter.scheduled
+                ? const _ScheduledList()
                 : list.isEmpty
                 ? _Empty(
                     text: filter == _Filter.completed
@@ -194,6 +198,100 @@ class _RideTile extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ScheduledList extends ConsumerWidget {
+  const _ScheduledList();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final rides = ref.watch(scheduledRidesProvider);
+    if (rides.isEmpty) {
+      return const _Empty(
+        text: 'No scheduled rides. Tap the calendar when booking.',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      itemCount: rides.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (_, i) {
+        final r = rides[i];
+        return InkWell(
+          onTap: () => context.push(Routes.scheduledDetailsFor(r.id)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Icon(
+                    r.rideType.icon,
+                    size: 22,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        r.destination.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        r.driver == null
+                            ? 'Waiting for a driver'
+                            : 'Driver: ${r.driver!.name}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: r.driver == null
+                              ? AppColors.textSecondary
+                              : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatTime(r.pickupAt),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      formatDateTimeShort(r.pickupAt).split(' · ').first,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

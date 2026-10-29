@@ -2,6 +2,9 @@
 
 Ride-hailing platform for Nigeria. Flutter (iOS + Android), free/open resources only.
 
+## Live preview
+https://thetechguydev.github.io/GoRide/  (auto-deploys on every push to `main`)
+
 ## Structure
 - `rider_app/` – Rider mobile app (Flutter)
 - `driver_app/` – Driver mobile app (coming)

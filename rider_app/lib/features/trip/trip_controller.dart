@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/services/routing_service.dart';
+import '../activity/ride_history.dart';
 import '../booking/booking_controller.dart';
 import '../booking/payment_methods.dart';
 import '../booking/ride_types.dart';
@@ -340,6 +341,7 @@ class TripController extends Notifier<TripState?> {
       progress: 1,
       endedAt: DateTime.now(),
     );
+    ref.read(rideHistoryProvider.notifier).add(RideRecord.fromTrip(state!));
   }
 
   void cancel(String reason) {
@@ -347,6 +349,7 @@ class TripController extends Notifier<TripState?> {
     final s = state;
     if (s == null) return;
     state = s.copyWith(phase: TripPhase.cancelled, cancelReason: reason);
+    ref.read(rideHistoryProvider.notifier).add(RideRecord.fromTrip(state!));
   }
 
   /// Clears the finished/cancelled trip and the booking draft.

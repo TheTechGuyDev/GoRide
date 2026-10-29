@@ -210,39 +210,3 @@ class _TripArrivedScreenState extends ConsumerState<TripArrivedScreen> {
     );
   }
 }
-
-/// Temporary until Step 7 (rating, tip, receipt).
-class RateDriverPlaceholder extends ConsumerWidget {
-  const RateDriverPlaceholder({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.star_rounded, size: 72, color: AppColors.star),
-              const SizedBox(height: 16),
-              const Text(
-                'Rating, tips and receipts come in Step 7',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 28),
-              AppButton(
-                label: 'Back to home',
-                onPressed: () {
-                  ref.read(tripControllerProvider.notifier).clear();
-                  context.go(Routes.home);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

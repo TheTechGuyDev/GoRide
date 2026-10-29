@@ -10,7 +10,10 @@ import '../../features/booking/promos_screen.dart';
 import '../../features/booking/ride_options_screen.dart';
 import '../../features/booking/set_pickup_screen.dart';
 import '../../features/booking/where_to_screen.dart';
+import '../../features/activity/activity_tab.dart';
+import '../../features/activity/ride_details_screen.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/trip/rate_driver_screen.dart';
 import '../../features/safety/emergency_contacts.dart';
 import '../../features/safety/emergency_screen.dart';
 import '../../features/trip/call_screen.dart';
@@ -65,10 +68,7 @@ final appRouter = GoRouter(
           routes: [
             GoRoute(
               path: Routes.activity,
-              builder: (_, _) => const ComingSoonTab(
-                title: 'Activity',
-                icon: Icons.receipt_long,
-              ),
+              builder: (_, _) => const ActivityTab(),
             ),
           ],
         ),
@@ -157,11 +157,26 @@ final appRouter = GoRouter(
       parentNavigatorKey: _rootKey,
       builder: (_, _) => const TripArrivedScreen(),
     ),
-    // Built in Step 7 (rating, tip & receipt).
     GoRoute(
       path: Routes.rateDriver,
       parentNavigatorKey: _rootKey,
-      builder: (_, _) => const RateDriverPlaceholder(),
+      builder: (_, _) => const RateDriverScreen(),
+    ),
+    GoRoute(
+      path: Routes.tipDriver,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const TipDriverScreen(),
+    ),
+    GoRoute(
+      path: Routes.feedbackThanks,
+      parentNavigatorKey: _rootKey,
+      builder: (_, state) => FeedbackThanksScreen(tip: state.extra as int?),
+    ),
+    GoRoute(
+      path: Routes.rideDetails,
+      parentNavigatorKey: _rootKey,
+      builder: (_, state) =>
+          RideDetailsScreen(rideId: state.pathParameters['id']!),
     ),
   ],
 );

@@ -31,6 +31,10 @@ class Routes {
   static const rideCanceled = '/ride-canceled';
   static const tripArrived = '/trip-arrived';
   static const rateDriver = '/rate-driver';
+  static const tipDriver = '/tip-driver';
+  static const feedbackThanks = '/feedback-thanks';
+  static const rideDetails = '/ride/:id';
+  static String rideDetailsFor(String id) => '/ride/$id';
 
   // Safety
   static const emergency = '/trip/emergency';

@@ -11,6 +11,12 @@ import '../../features/booking/ride_options_screen.dart';
 import '../../features/booking/set_pickup_screen.dart';
 import '../../features/booking/where_to_screen.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/trip/call_screen.dart';
+import '../../features/trip/cancel_ride_screen.dart';
+import '../../features/trip/chat_screen.dart';
+import '../../features/trip/driver_info_screen.dart';
+import '../../features/trip/trip_arrived_screen.dart';
+import '../../features/trip/trip_screen.dart';
 import '../../features/home/home_tab.dart';
 import '../../features/onboarding/splash_screen.dart';
 import '../../features/onboarding/walkthrough_screen.dart';
@@ -102,14 +108,48 @@ final appRouter = GoRouter(
       parentNavigatorKey: _rootKey,
       builder: (_, _) => const PromosScreen(applying: true),
     ),
-    // Built in Step 6 (driver matching & live trip).
     GoRoute(
-      path: Routes.findingDriver,
+      path: Routes.trip,
       parentNavigatorKey: _rootKey,
-      builder: (_, _) => const ComingSoonTab(
-        title: 'Finding a driver',
-        icon: Icons.local_taxi,
-      ),
+      builder: (_, _) => const TripScreen(),
+      routes: [
+        GoRoute(
+          path: 'driver',
+          parentNavigatorKey: _rootKey,
+          builder: (_, _) => const DriverInfoScreen(),
+        ),
+        GoRoute(
+          path: 'chat',
+          parentNavigatorKey: _rootKey,
+          builder: (_, _) => const ChatScreen(),
+        ),
+        GoRoute(
+          path: 'call',
+          parentNavigatorKey: _rootKey,
+          builder: (_, _) => const CallScreen(),
+        ),
+        GoRoute(
+          path: 'cancel',
+          parentNavigatorKey: _rootKey,
+          builder: (_, _) => const CancelRideScreen(),
+        ),
+      ],
+    ),
+    GoRoute(
+      path: Routes.rideCanceled,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const RideCanceledScreen(),
+    ),
+    GoRoute(
+      path: Routes.tripArrived,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const TripArrivedScreen(),
+    ),
+    // Built in Step 7 (rating, tip & receipt).
+    GoRoute(
+      path: Routes.rateDriver,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const RateDriverPlaceholder(),
     ),
   ],
 );

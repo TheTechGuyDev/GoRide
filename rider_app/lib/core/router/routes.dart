@@ -21,5 +21,14 @@ class Routes {
   static const rideOptions = '/ride-options';
   static const paymentMethod = '/payment-method';
   static const applyPromo = '/apply-promo';
-  static const findingDriver = '/finding-driver';
+
+  // Live trip
+  static const trip = '/trip';
+  static const driverInfo = '/trip/driver';
+  static const chat = '/trip/chat';
+  static const call = '/trip/call';
+  static const cancelRide = '/trip/cancel';
+  static const rideCanceled = '/ride-canceled';
+  static const tripArrived = '/trip-arrived';
+  static const rateDriver = '/rate-driver';
 }

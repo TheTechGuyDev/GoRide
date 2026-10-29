@@ -12,6 +12,7 @@ import '../../core/widgets/app_button.dart';
 import '../auth/auth_controller.dart';
 import '../home/widgets/map_markers.dart';
 import '../location/location_controller.dart';
+import '../trip/trip_controller.dart';
 import 'booking_controller.dart';
 import 'payment_methods.dart';
 import 'ride_types.dart';
@@ -64,7 +65,8 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
       );
       return;
     }
-    context.push(Routes.findingDriver);
+    ref.read(tripControllerProvider.notifier).start(route);
+    context.go(Routes.trip);
   }
 
   @override

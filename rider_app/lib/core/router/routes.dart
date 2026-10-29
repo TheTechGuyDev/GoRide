@@ -17,4 +17,6 @@ class Routes {
 
   // Booking flow
   static const whereTo = '/where-to';
+  static const setPickup = '/set-pickup';
+  static const rideOptions = '/ride-options';
 }

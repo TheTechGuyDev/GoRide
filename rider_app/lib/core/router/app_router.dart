@@ -1,6 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/otp_screen.dart';
+import '../../features/auth/personal_info_screen.dart';
+import '../../features/auth/sign_in_screen.dart';
+import '../../features/auth/sign_up_screen.dart';
+import '../../features/home/home_placeholder_screen.dart';
 import '../../features/onboarding/splash_screen.dart';
 import '../../features/onboarding/walkthrough_screen.dart';
 import '../../features/onboarding/welcome_screen.dart';
@@ -15,27 +19,16 @@ final appRouter = GoRouter(
       builder: (_, _) => const WalkthroughScreen(),
     ),
     GoRoute(path: Routes.welcome, builder: (_, _) => const WelcomeScreen()),
-    // Built in Step 2 (auth).
+    GoRoute(path: Routes.signUp, builder: (_, _) => const SignUpScreen()),
+    GoRoute(path: Routes.signIn, builder: (_, _) => const SignInScreen()),
+    GoRoute(path: Routes.otp, builder: (_, _) => const OtpScreen()),
     GoRoute(
-      path: Routes.signUp,
-      builder: (_, _) => const _ComingNext(title: 'Sign up'),
+      path: Routes.personalInfo,
+      builder: (_, _) => const PersonalInfoScreen(),
     ),
     GoRoute(
-      path: Routes.signIn,
-      builder: (_, _) => const _ComingNext(title: 'Sign in'),
+      path: Routes.home,
+      builder: (_, _) => const HomePlaceholderScreen(),
     ),
   ],
 );
-
-class _ComingNext extends StatelessWidget {
-  const _ComingNext({required this.title});
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: const Center(child: Text('Coming in the next step')),
-    );
-  }
-}

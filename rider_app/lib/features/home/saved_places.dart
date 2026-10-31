@@ -8,18 +8,48 @@ class SavedPlace {
     required this.label,
     required this.address,
     required this.position,
-    this.icon = Icons.place_outlined,
+    this.details = '',
   });
 
   final String id;
+
+  /// What the rider calls it: Home, Office, Mum's House...
   final String label;
   final String address;
   final LatLng position;
-  final IconData icon;
+
+  /// Extra directions: floor, flat number, gate colour.
+  final String details;
+
+  IconData get icon {
+    final l = label.toLowerCase();
+    if (l.contains('home') || l.contains('house')) return Icons.home_outlined;
+    if (l.contains('office') || l.contains('work')) return Icons.work_outline;
+    if (l.contains('school') || l.contains('uni')) return Icons.school_outlined;
+    if (l.contains('gym')) return Icons.fitness_center;
+    return Icons.place_outlined;
+  }
+
+  SavedPlace copyWith({
+    String? label,
+    String? address,
+    LatLng? position,
+    String? details,
+  }) {
+    return SavedPlace(
+      id: id,
+      label: label ?? this.label,
+      address: address ?? this.address,
+      position: position ?? this.position,
+      details: details ?? this.details,
+    );
+  }
 }
 
-/// Mock saved places (Lagos). Later: `saved_places` table in Supabase.
+/// Saved addresses (Lagos samples). Later: `saved_places` table in Supabase.
 class SavedPlacesController extends Notifier<List<SavedPlace>> {
+  static const maxPlaces = 10;
+
   @override
   List<SavedPlace> build() => const [
     SavedPlace(
@@ -27,23 +57,33 @@ class SavedPlacesController extends Notifier<List<SavedPlace>> {
       label: 'Home',
       address: '12 Admiralty Way, Lekki Phase 1, Lagos',
       position: LatLng(6.4474, 3.4720),
-      icon: Icons.home_outlined,
+      details: 'Estate gate 2, Block C',
     ),
     SavedPlace(
       id: 'office',
       label: 'Office',
       address: '1 Adeola Odeku St, Victoria Island, Lagos',
       position: LatLng(6.4310, 3.4215),
-      icon: Icons.work_outline,
     ),
     SavedPlace(
       id: 'mum',
       label: 'Mum\'s House',
       address: '5 Allen Avenue, Ikeja, Lagos',
       position: LatLng(6.6018, 3.3515),
-      icon: Icons.favorite_border,
     ),
   ];
+
+  void save(SavedPlace p) {
+    final i = state.indexWhere((e) => e.id == p.id);
+    if (i == -1) {
+      if (state.length >= maxPlaces) return;
+      state = [...state, p];
+    } else {
+      state = [...state]..[i] = p;
+    }
+  }
+
+  void remove(String id) => state = state.where((e) => e.id != id).toList();
 }
 
 final savedPlacesProvider =

@@ -90,9 +90,12 @@ final walletBalanceProvider = NotifierProvider<WalletController, int>(
   WalletController.new,
 );
 
-/// Mock saved methods. Cards are added through Paystack (free test mode).
-final paymentMethodsProvider = Provider<List<PaymentMethod>>((ref) {
-  return const [
+/// Saved payment methods. Cards are added through Paystack: in the live app
+/// Paystack charges ₦50 to verify the card, refunds it, and gives us a
+/// reusable authorization code. We never store full card numbers.
+class PaymentMethodsController extends Notifier<List<PaymentMethod>> {
+  @override
+  List<PaymentMethod> build() => const [
     PaymentMethod(
       id: 'wallet',
       kind: PaymentKind.wallet,
@@ -118,4 +121,26 @@ final paymentMethodsProvider = Provider<List<PaymentMethod>>((ref) {
       subtitle: 'Pay to a one-time account number',
     ),
   ];
-});
+
+  void addCard({required String brand, required String last4}) {
+    final card = PaymentMethod(
+      id: 'card-$last4-${DateTime.now().millisecondsSinceEpoch % 10000}',
+      kind: PaymentKind.card,
+      title: brand,
+      subtitle: '•••• •••• •••• $last4',
+    );
+    // Cards sit after Cash, before Bank Transfer.
+    final i = state.lastIndexWhere((m) => m.kind != PaymentKind.transfer) + 1;
+    state = [...state]..insert(i, card);
+  }
+
+  /// Only cards can be removed; wallet, cash and transfer are built in.
+  void remove(String id) => state = state
+      .where((m) => m.id != id || m.kind != PaymentKind.card)
+      .toList();
+}
+
+final paymentMethodsProvider =
+    NotifierProvider<PaymentMethodsController, List<PaymentMethod>>(
+      PaymentMethodsController.new,
+    );

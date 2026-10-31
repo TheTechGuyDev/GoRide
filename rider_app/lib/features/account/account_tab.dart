@@ -9,7 +9,7 @@ import '../../core/utils/phone_utils.dart';
 import '../auth/auth_controller.dart';
 import '../booking/payment_methods.dart';
 
-/// Screen 63 (account home). Full settings pages arrive in Steps 10-11.
+/// Screen 63: account home.
 class AccountTab extends ConsumerWidget {
   const AccountTab({super.key});
 
@@ -20,8 +20,10 @@ class AccountTab extends ConsumerWidget {
     final name = profile.fullName.isEmpty ? 'GoRide Rider' : profile.fullName;
 
     return Scaffold(
+      backgroundColor: AppColors.fieldFill,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        backgroundColor: AppColors.fieldFill,
         leading: Padding(
           padding: const EdgeInsets.only(left: 20),
           child: Image.asset('assets/images/logo_green.png', width: 30),
@@ -34,6 +36,7 @@ class AccountTab extends ConsumerWidget {
         children: [
           Container(
             decoration: BoxDecoration(
+              color: Colors.white,
               border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(16),
             ),
@@ -41,6 +44,7 @@ class AccountTab extends ConsumerWidget {
               children: [
                 ListTile(
                   contentPadding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+                  onTap: () => context.push(Routes.editProfile),
                   leading: CircleAvatar(
                     radius: 26,
                     backgroundColor: AppColors.primaryLight,
@@ -60,9 +64,10 @@ class AccountTab extends ConsumerWidget {
                   ),
                   subtitle: Text(
                     profile.phone.isEmpty
-                        ? 'Not signed in'
+                        ? 'Tap to complete your profile'
                         : PhoneUtils.pretty(profile.phone),
                   ),
+                  trailing: const Icon(Icons.chevron_right),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -105,24 +110,48 @@ class AccountTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _Item(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'GoRide Wallet',
-            onTap: () => context.push(Routes.wallet),
+          _Group(
+            items: [
+              _Item(
+                Icons.place_outlined,
+                'Saved Addresses',
+                Routes.savedAddresses,
+              ),
+              _Item(
+                Icons.credit_card,
+                'Payment Methods',
+                Routes.paymentSettings,
+              ),
+              _Item(
+                Icons.notifications_none,
+                'Notifications',
+                Routes.notificationSettings,
+              ),
+              _Item(
+                Icons.contacts_outlined,
+                'Emergency Contacts',
+                Routes.emergencyContacts,
+              ),
+            ],
           ),
-          _Item(
-            icon: Icons.contacts_outlined,
-            label: 'Emergency Contacts',
-            onTap: () => context.push(Routes.emergencyContacts),
+          _Group(
+            items: [
+              _Item(
+                Icons.shield_outlined,
+                'Account & Security',
+                Routes.accountSecurity,
+              ),
+              _Item(Icons.link, 'Linked Accounts', Routes.linkedAccounts),
+              _Item(
+                Icons.privacy_tip_outlined,
+                'Data & Privacy',
+                Routes.dataPrivacy,
+              ),
+            ],
           ),
-          _Item(
-            icon: Icons.credit_card,
-            label: 'Payment Methods',
-            onTap: () => context.push(Routes.paymentMethod),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
           const Text(
-            'Profile, saved addresses, notifications, appearance and help are coming in the next steps.',
+            'Appearance, language, help & support, referrals and log out arrive in the next step.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),
@@ -132,20 +161,40 @@ class AccountTab extends ConsumerWidget {
   }
 }
 
-class _Item extends StatelessWidget {
-  const _Item({required this.icon, required this.label, required this.onTap});
+class _Item {
+  const _Item(this.icon, this.label, this.route);
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final String route;
+}
+
+class _Group extends StatelessWidget {
+  const _Group({required this.items});
+  final List<_Item> items;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: Icon(icon, color: AppColors.textPrimary),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          for (final i in items)
+            ListTile(
+              leading: Icon(i.icon, color: AppColors.textPrimary),
+              title: Text(
+                i.label,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(i.route),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -14,6 +14,9 @@ import '../../features/activity/activity_tab.dart';
 import '../../features/activity/ride_details_screen.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/account/account_tab.dart';
+import '../../features/account/payment_settings_screen.dart';
+import '../../features/account/saved_addresses_screen.dart';
+import '../../features/account/settings_screens.dart';
 import '../../features/wallet/top_up_details_screen.dart';
 import '../../features/wallet/top_up_method_screen.dart';
 import '../../features/wallet/top_up_screen.dart';
@@ -180,6 +183,41 @@ final appRouter = GoRouter(
       parentNavigatorKey: _rootKey,
       builder: (_, state) =>
           TopUpDetailsScreen(txId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: Routes.editProfile,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const EditProfileScreen(),
+    ),
+    GoRoute(
+      path: Routes.savedAddresses,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const SavedAddressesScreen(),
+    ),
+    GoRoute(
+      path: Routes.paymentSettings,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const PaymentSettingsScreen(),
+    ),
+    GoRoute(
+      path: Routes.notificationSettings,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const NotificationSettingsScreen(),
+    ),
+    GoRoute(
+      path: Routes.accountSecurity,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const AccountSecurityScreen(),
+    ),
+    GoRoute(
+      path: Routes.linkedAccounts,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const LinkedAccountsScreen(),
+    ),
+    GoRoute(
+      path: Routes.dataPrivacy,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const DataPrivacyScreen(),
     ),
     GoRoute(
       path: Routes.emergencyContacts,

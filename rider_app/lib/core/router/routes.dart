@@ -49,6 +49,15 @@ class Routes {
   static const topUpDetails = '/top-up-details/:id';
   static String topUpDetailsFor(String id) => '/top-up-details/$id';
 
+  // Account
+  static const editProfile = '/account/profile';
+  static const savedAddresses = '/account/addresses';
+  static const paymentSettings = '/account/payments';
+  static const notificationSettings = '/account/notifications';
+  static const accountSecurity = '/account/security';
+  static const linkedAccounts = '/account/linked';
+  static const dataPrivacy = '/account/privacy';
+
   // Safety
   static const emergency = '/trip/emergency';
   static const emergencyContacts = '/emergency-contacts';

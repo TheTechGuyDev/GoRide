@@ -208,13 +208,7 @@ class _WhereToPanel extends ConsumerWidget {
                   _PlaceChip(
                     label: 'Add',
                     icon: Icons.add,
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Saved addresses come with Account'),
-                        ),
-                      );
-                    },
+                    onTap: () => context.push(Routes.savedAddresses),
                   ),
                 ],
               ),

@@ -95,7 +95,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
         result = await showModalBottomSheet<TopUpResult>(
           context: context,
           isScrollControlled: true,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -106,7 +106,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
         result = await showModalBottomSheet<TopUpResult>(
           context: context,
           isScrollControlled: true,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -117,7 +117,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
         result = await showModalBottomSheet<TopUpResult>(
           context: context,
           isScrollControlled: true,
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.surface,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -181,10 +181,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
               Text(
                 'You\'ve successfully added ${naira(widget.amount)} to your GoRide Wallet.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  height: 1.5,
-                ),
+                style: TextStyle(color: AppColors.textSecondary, height: 1.5),
               ),
               const SizedBox(height: 24),
               AppButton(label: 'OK', onPressed: () => Navigator.pop(ctx)),
@@ -204,7 +201,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
         children: [
           for (final o in _options) ...[
             Material(
-              color: Colors.white,
+              color: AppColors.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(
@@ -245,7 +242,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
                             const SizedBox(height: 3),
                             Text(
                               o.subtitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
                               ),
@@ -263,7 +260,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
             const SizedBox(height: 14),
           ],
           const SizedBox(height: 4),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.lock, size: 14, color: AppColors.textSecondary),
@@ -419,7 +416,7 @@ class _CardCheckoutState extends State<_CardCheckout> {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Test card pre-filled. No real money moves in test mode.',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
@@ -467,7 +464,7 @@ class _TransferCheckoutState extends State<_TransferCheckout> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(label, style: TextStyle(color: AppColors.textSecondary)),
           const Spacer(),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
           if (copy)
@@ -516,7 +513,7 @@ class _TransferCheckoutState extends State<_TransferCheckout> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               'This account number is for this payment only and expires in 30 minutes.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
@@ -598,7 +595,7 @@ class _UssdCheckoutState extends State<_UssdCheckout> {
             ),
             child: Column(
               children: [
-                const Text(
+                Text(
                   'Dial this code on the phone linked to your bank account',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary),

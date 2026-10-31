@@ -60,7 +60,7 @@ class EmergencyScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
             ),
@@ -78,7 +78,7 @@ class EmergencyScreen extends ConsumerWidget {
                 const SizedBox(height: 6),
                 Text(e.reason, style: const TextStyle(height: 1.4)),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Your live location keeps updating for the people below and the GoRide safety team until you mark yourself safe.',
                   style: TextStyle(color: AppColors.textSecondary, height: 1.4),
                 ),
@@ -140,7 +140,7 @@ class EmergencyScreen extends ConsumerWidget {
               ),
             ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Preview: email and app alerts send for real once the backend (Supabase) is connected. WhatsApp works now.',
             style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),
@@ -218,7 +218,7 @@ class _AlertedRow extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),

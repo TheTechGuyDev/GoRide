@@ -53,7 +53,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
               ? '${m.subtitle}: ${naira(balance)}'
               : m.subtitle;
           return Material(
-            color: Colors.white,
+            color: AppColors.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
@@ -92,7 +92,7 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
                           const SizedBox(height: 4),
                           Text(
                             subtitle,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
                             ),

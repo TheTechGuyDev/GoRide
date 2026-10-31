@@ -4,7 +4,11 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../core/notifications/notification_service.dart';
+import '../../core/router/app_router.dart';
+import '../../core/router/routes.dart';
 import '../../core/services/routing_service.dart';
+import '../../core/utils/money.dart';
 import '../activity/ride_history.dart';
 import '../booking/booking_controller.dart';
 import '../booking/payment_methods.dart';
@@ -46,6 +50,21 @@ class TripController extends Notifier<TripState?> {
   static const _waitAtPickup = Duration(seconds: 9);
   static const _tripTime = Duration(seconds: 35);
   static const _tick = Duration(milliseconds: 400);
+
+  bool _warnedArriving = false;
+
+  void _notify(
+    NotifyCategory c,
+    String title,
+    String body, {
+    String route = Routes.trip,
+    int? id = NotifyIds.rideStatus,
+    bool urgent = false,
+  }) {
+    ref
+        .read(notificationsProvider.notifier)
+        .notify(c, title, body, route: route, id: id, urgent: urgent);
+  }
 
   @override
   TripState? build() {
@@ -114,6 +133,13 @@ class TripController extends Notifier<TripState?> {
       progress: 0,
     );
 
+    _warnedArriving = false;
+    _notify(
+      NotifyCategory.rideStatus,
+      'Driver found: ${driver.name}',
+      '${driver.carColor} ${driver.carModel} · ${driver.plate}. Arriving in ${state?.minutesLeft ?? 3} mins.',
+    );
+
     Timer(const Duration(seconds: 3), () {
       _driverSays(
         'Hello, I\'m ${driver.firstName}. I\'m on my way to your pickup. '
@@ -143,6 +169,16 @@ class TripController extends Notifier<TripState?> {
         driverHeading: pos.heading,
       );
       onMove?.call(pos.point);
+      if (s.phase == TripPhase.driverEnRoute &&
+          !_warnedArriving &&
+          next >= 0.75) {
+        _warnedArriving = true;
+        _notify(
+          NotifyCategory.rideStatus,
+          '${s.driver?.firstName ?? 'Your driver'} is almost there',
+          'Arriving in about 1 min. Please head to your pickup point.',
+        );
+      }
       if (next >= 1) {
         t.cancel();
         onDone();
@@ -154,6 +190,11 @@ class TripController extends Notifier<TripState?> {
     final s = state;
     if (s == null) return;
     state = s.copyWith(phase: TripPhase.driverArrived, progress: 1);
+    _notify(
+      NotifyCategory.rideStatus,
+      'Your driver has arrived',
+      'Check the plate ${s.driver?.plate ?? ''}, then share your ride PIN: ${s.pin}',
+    );
     _driverSays(
       'I\'m at the pickup point. ${s.pickupNote.isNotEmpty ? 'Close to: ${s.pickupNote}.' : ''}',
     );
@@ -173,6 +214,11 @@ class TripController extends Notifier<TripState?> {
       startedAt: DateTime.now(),
       driverPosition: first.point,
       driverHeading: first.heading,
+    );
+    _notify(
+      NotifyCategory.rideStatus,
+      'Trip started',
+      'Heading to ${s.destination.name}. GoRide is watching your route.',
     );
     _runLeg(
       s.tripRoute.points,
@@ -209,6 +255,13 @@ class TripController extends Notifier<TripState?> {
     state = s.copyWith(
       routeAlert: RouteAlert(startedAt: now, deadline: now.add(alertTimeout)),
     );
+    _notify(
+      NotifyCategory.safety,
+      'Your driver has left the route',
+      'Open GoRide now to confirm the route. SOS is sent automatically in 60 seconds.',
+      id: NotifyIds.routeAlert,
+      urgent: true,
+    );
     _alertTimer?.cancel();
     _alertTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final a = state?.routeAlert;
@@ -225,6 +278,13 @@ class TripController extends Notifier<TripState?> {
       if (a.stage == RouteAlertStage.asking && !now.isBefore(escalateAt)) {
         state = state!.copyWith(
           routeAlert: a.copyWith(stage: RouteAlertStage.escalated),
+        );
+        _notify(
+          NotifyCategory.safety,
+          'Sending SOS in 15 seconds',
+          'Your driver is still off route. Tap to respond.',
+          id: NotifyIds.routeAlert,
+          urgent: true,
         );
       }
     });
@@ -297,6 +357,14 @@ class TripController extends Notifier<TripState?> {
         reason: reason,
       ),
     );
+    _notify(
+      NotifyCategory.safety,
+      '🆘 Emergency mode on',
+      'Your emergency contacts and the GoRide safety team have your live location.',
+      route: Routes.emergency,
+      id: NotifyIds.sos,
+      urgent: true,
+    );
   }
 
   /// Rider confirms they are safe; ends emergency mode.
@@ -344,6 +412,14 @@ class TripController extends Notifier<TripState?> {
       endedAt: DateTime.now(),
     );
     ref.read(rideHistoryProvider.notifier).add(RideRecord.fromTrip(state!));
+    _notify(
+      NotifyCategory.rideStatus,
+      'You have arrived at ${s.destination.name}',
+      s.paymentId == 'cash'
+          ? 'Please pay ${naira(s.total)} cash to your driver. Tap to rate your trip.'
+          : '${naira(s.total)} paid. Tap to rate your trip.',
+      route: Routes.tripArrived,
+    );
   }
 
   void cancel(String reason) {
@@ -395,6 +471,18 @@ class TripController extends Notifier<TripState?> {
       ],
       unreadMessages: s.unreadMessages + 1,
     );
+    // Don't notify if the rider is already reading the chat.
+    final onChat =
+        appRouter.routerDelegate.currentConfiguration.uri.path == Routes.chat;
+    if (!onChat) {
+      _notify(
+        NotifyCategory.messages,
+        s.driver!.firstName,
+        text,
+        route: Routes.chat,
+        id: null,
+      );
+    }
   }
 
   String _replyTo(String text) {

@@ -59,10 +59,7 @@ class _TripArrivedScreenState extends ConsumerState<TripArrivedScreen> {
           ),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -109,7 +106,7 @@ class _TripArrivedScreenState extends ConsumerState<TripArrivedScreen> {
               Text(
                 trip.destination.address,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 20),
               Container(

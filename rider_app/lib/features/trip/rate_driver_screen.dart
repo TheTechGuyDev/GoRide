@@ -76,7 +76,7 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Text(a, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(a, style: TextStyle(color: AppColors.textSecondary)),
           const Spacer(),
           Text(
             b,
@@ -108,7 +108,7 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Help GoRide do better by rating this trip',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary),
@@ -164,7 +164,7 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
                             : AppColors.border,
                       ),
                       shape: const StadiumBorder(),
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.surface,
                       onSelected: (on) => setState(
                         () => on ? _selected.add(c) : _selected.remove(c),
                       ),
@@ -300,10 +300,7 @@ class _TipDriverScreenState extends ConsumerState<TipDriverScreen> {
             Text(
               'Would you like to add a tip to make ${d?.firstName ?? 'your driver'}\'s day?',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
+              style: TextStyle(color: AppColors.textSecondary, height: 1.4),
             ),
             const Divider(height: 36),
             GridView.count(
@@ -364,7 +361,7 @@ class _TipDriverScreenState extends ConsumerState<TipDriverScreen> {
               'Tip is charged from your GoRide Wallet (${naira(balance)}). '
               '100% of the tip goes to your driver.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.textSecondary,
                 fontSize: 13,
                 height: 1.5,
@@ -493,10 +490,7 @@ class FeedbackThanksScreen extends ConsumerWidget {
                       ? 'Your ${naira(tip!)} tip has been sent to your driver. See you on your next trip!'
                       : 'See you on your next trip!',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
+                  style: TextStyle(color: AppColors.textSecondary, height: 1.5),
                 ),
                 const Spacer(),
                 if (trip != null)

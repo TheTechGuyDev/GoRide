@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/config/map_config.dart';
+import '../../core/notifications/notification_service.dart';
+import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/auth_controller.dart';
 import '../location/location_controller.dart';
@@ -77,6 +80,7 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
             TileLayer(
               urlTemplate: MapConfig.tileUrl,
               userAgentPackageName: MapConfig.userAgent,
+              tileBuilder: AppColors.isDark ? darkModeTileBuilder : null,
               maxZoom: 19,
             ),
             if (ready)
@@ -149,14 +153,21 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
           ),
         ),
 
+        // Notifications bell
+        Positioned(
+          top: MediaQuery.paddingOf(context).top + 8,
+          right: 16,
+          child: const _BellButton(),
+        ),
+
         if (ready && loc.isFallback)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 12,
             left: 16,
-            right: 16,
+            right: 68,
             child: Center(
               child: Material(
-                color: Colors.white,
+                color: AppColors.surface,
                 elevation: 2,
                 borderRadius: BorderRadius.circular(20),
                 child: InkWell(
@@ -203,7 +214,7 @@ class _RoundMapButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       shape: const CircleBorder(),
       elevation: 3,
       shadowColor: Colors.black26,
@@ -216,6 +227,49 @@ class _RoundMapButton extends StatelessWidget {
           child: Icon(icon, color: AppColors.textPrimary, size: 22),
         ),
       ),
+    );
+  }
+}
+
+class _BellButton extends ConsumerWidget {
+  const _BellButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(notificationsProvider);
+    final unread = ref.read(notificationsProvider.notifier).unread;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _RoundMapButton(
+          icon: Icons.notifications_none,
+          onTap: () => context.push(Routes.notifications),
+        ),
+        if (unread > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 20),
+              height: 20,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.surface, width: 2),
+              ),
+              child: Text(
+                unread > 9 ? '9+' : '$unread',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

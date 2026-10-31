@@ -119,7 +119,7 @@ class _RouteAlertOverlayState extends ConsumerState<RouteAlertOverlay>
           child: Container(
             margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(24),
             ),
             clipBehavior: Clip.antiAlias,
@@ -200,7 +200,7 @@ class _RouteAlertOverlayState extends ConsumerState<RouteAlertOverlay>
                                 'The car is going a different way from the route on your app. '
                                 'If you know this way, accept it. If you don\'t answer, '
                                 'SOS is sent to your emergency contacts automatically.',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   height: 1.45,
                                   color: AppColors.textSecondary,
                                 ),
@@ -227,7 +227,7 @@ class _RouteAlertOverlayState extends ConsumerState<RouteAlertOverlay>
                           ),
                         ] else if (a.askedDriver) ...[
                           const SizedBox(height: 14),
-                          const Text(
+                          Text(
                             'Waiting for your driver\'s reply...',
                             style: TextStyle(color: AppColors.textSecondary),
                           ),

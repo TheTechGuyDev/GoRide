@@ -32,7 +32,7 @@ class TopUpDetailsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         children: [
-          Text(a, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(a, style: TextStyle(color: AppColors.textSecondary)),
           const Spacer(),
           b,
         ],
@@ -51,7 +51,7 @@ class TopUpDetailsScreen extends ConsumerWidget {
         children: [
           val(s),
           const SizedBox(width: 6),
-          const Icon(Icons.copy, size: 15, color: AppColors.textSecondary),
+          Icon(Icons.copy, size: 15, color: AppColors.textSecondary),
         ],
       ),
     );
@@ -75,7 +75,7 @@ class TopUpDetailsScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
             ),
@@ -110,7 +110,7 @@ class TopUpDetailsScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   'From ${t.method}',
-                  style: const TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -119,7 +119,7 @@ class TopUpDetailsScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
             ),

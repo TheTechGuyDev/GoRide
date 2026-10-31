@@ -36,7 +36,7 @@ class SavedAddressesScreen extends ConsumerWidget {
   ) async {
     final ok = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -111,7 +111,7 @@ class SavedAddressesScreen extends ConsumerWidget {
         backgroundColor: AppColors.fieldFill,
       ),
       body: places.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'No saved addresses yet',
                 style: TextStyle(color: AppColors.textSecondary),
@@ -125,7 +125,7 @@ class SavedAddressesScreen extends ConsumerWidget {
                 final p = places[i];
                 return Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.border),
                   ),
@@ -218,7 +218,7 @@ class SavedAddressesScreen extends ConsumerWidget {
                               const SizedBox(height: 4),
                               Text(
                                 p.details,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
                                 ),
@@ -334,7 +334,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: p == null
-                        ? const Text(
+                        ? Text(
                             'Choose location on the map',
                             style: TextStyle(color: AppColors.textSecondary),
                           )
@@ -351,7 +351,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 p.address,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
                                 ),
@@ -385,8 +385,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                 ActionChip(
                   label: Text(s),
                   onPressed: () => setState(() => _label.text = s),
-                  backgroundColor: Colors.white,
-                  shape: const StadiumBorder(
+                  backgroundColor: AppColors.surface,
+                  shape: StadiumBorder(
                     side: BorderSide(color: AppColors.border),
                   ),
                 ),

@@ -57,6 +57,12 @@ class Routes {
   static const accountSecurity = '/account/security';
   static const linkedAccounts = '/account/linked';
   static const dataPrivacy = '/account/privacy';
+  static const appearance = '/account/appearance';
+  static const help = '/help';
+  static const privacyPolicy = '/legal/privacy';
+  static const terms = '/legal/terms';
+  static const referral = '/invite';
+  static const notifications = '/notifications';
 
   // Safety
   static const emergency = '/trip/emergency';

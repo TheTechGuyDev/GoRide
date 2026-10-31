@@ -17,6 +17,8 @@ import '../../features/account/account_tab.dart';
 import '../../features/account/payment_settings_screen.dart';
 import '../../features/account/saved_addresses_screen.dart';
 import '../../features/account/settings_screens.dart';
+import '../../features/account/more_screens.dart';
+import '../../features/notifications/notifications_screen.dart';
 import '../../features/wallet/top_up_details_screen.dart';
 import '../../features/wallet/top_up_method_screen.dart';
 import '../../features/wallet/top_up_screen.dart';
@@ -218,6 +220,36 @@ final appRouter = GoRouter(
       path: Routes.dataPrivacy,
       parentNavigatorKey: _rootKey,
       builder: (_, _) => const DataPrivacyScreen(),
+    ),
+    GoRoute(
+      path: Routes.appearance,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const AppearanceScreen(),
+    ),
+    GoRoute(
+      path: Routes.help,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const HelpSupportScreen(),
+    ),
+    GoRoute(
+      path: Routes.privacyPolicy,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const LegalScreen(terms: false),
+    ),
+    GoRoute(
+      path: Routes.terms,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const LegalScreen(terms: true),
+    ),
+    GoRoute(
+      path: Routes.referral,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const ReferralScreen(),
+    ),
+    GoRoute(
+      path: Routes.notifications,
+      parentNavigatorKey: _rootKey,
+      builder: (_, _) => const NotificationsScreen(),
     ),
     GoRoute(
       path: Routes.emergencyContacts,

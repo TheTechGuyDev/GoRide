@@ -81,7 +81,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         children: [
           Expanded(
             child: messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
                       'Say hello to your driver 👋',
                       style: TextStyle(color: AppColors.textSecondary),
@@ -106,10 +106,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     child: ActionChip(
                       label: Text(q),
                       onPressed: () => _send(q),
-                      shape: const StadiumBorder(
+                      shape: StadiumBorder(
                         side: BorderSide(color: AppColors.border),
                       ),
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.surface,
                     ),
                   ),
               ],

@@ -125,8 +125,8 @@ class _TripScreenState extends ConsumerState<TripScreen> {
           Container(
             margin: const EdgeInsets.only(top: 36),
             padding: const EdgeInsets.fromLTRB(24, 52, 24, 16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SafeArea(
@@ -170,9 +170,7 @@ class _TripScreenState extends ConsumerState<TripScreen> {
                             const SizedBox(height: 4),
                             Text(
                               d.vehicleLine,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                              ),
+                              style: TextStyle(color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -289,6 +287,9 @@ class _TripScreenState extends ConsumerState<TripScreen> {
                           TileLayer(
                             urlTemplate: MapConfig.tileUrl,
                             userAgentPackageName: MapConfig.userAgent,
+                            tileBuilder: AppColors.isDark
+                                ? darkModeTileBuilder
+                                : null,
                           ),
                           if (path.length >= 2)
                             PolylineLayer(
@@ -555,8 +556,8 @@ class _Panel extends ConsumerWidget {
     };
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
@@ -602,7 +603,7 @@ class _Panel extends ConsumerWidget {
                       Text(
                         subtitle,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.textSecondary,
                           height: 1.4,
                         ),
@@ -631,7 +632,7 @@ class _Panel extends ConsumerWidget {
                     const SizedBox(height: 10),
                     Text(
                       'Meet at: ${trip.pickupNote}',
-                      style: const TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(color: AppColors.textSecondary),
                     ),
                   ],
                 ],
@@ -678,7 +679,7 @@ class _TripDetails extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(vertical: 5),
           child: Row(
             children: [
-              Text(a, style: const TextStyle(color: AppColors.textSecondary)),
+              Text(a, style: TextStyle(color: AppColors.textSecondary)),
               const Spacer(),
               Text(
                 b,
@@ -721,7 +722,7 @@ class _PinBoxes extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const Text(
+        Text(
           'Your ride PIN',
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
@@ -780,7 +781,7 @@ class _TripCard extends StatelessWidget {
     );
 
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       elevation: 3,
       shadowColor: Colors.black26,
       borderRadius: BorderRadius.circular(14),
@@ -816,7 +817,7 @@ class _MapButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface,
         shape: const CircleBorder(),
         elevation: 3,
         shadowColor: Colors.black26,

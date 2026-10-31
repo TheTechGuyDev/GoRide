@@ -31,7 +31,7 @@ class WalletScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           if (txs.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(32),
               child: Center(
                 child: Text(
@@ -161,7 +161,7 @@ class WalletTxTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     formatDateTimeShort(tx.createdAt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
@@ -183,7 +183,7 @@ class WalletTxTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   tx.method,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),

@@ -4,7 +4,10 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../core/notifications/notification_service.dart';
+import '../../core/router/routes.dart';
 import '../../core/services/routing_service.dart';
+import '../../core/utils/dates.dart';
 import '../activity/ride_history.dart';
 import '../booking/booking_controller.dart';
 import '../booking/place.dart';
@@ -155,6 +158,15 @@ class ScheduledRidesController extends Notifier<List<ScheduledRide>> {
       plate: 'KJA-${100 + _rand.nextInt(900)}XY',
     );
     state = [for (final e in state) e.id == id ? e.withDriver(d) : e];
+    ref
+        .read(notificationsProvider.notifier)
+        .notify(
+          NotifyCategory.scheduled,
+          'Driver confirmed for your scheduled ride',
+          '${d.name} (${d.carColor} ${d.carModel}, ${d.plate}) will pick you up on '
+              '${formatDate(r.pickupAt)} at ${formatTime(r.pickupAt)}.',
+          route: Routes.scheduledDetailsFor(id),
+        );
   }
 
   /// Cancels and records it under Activity > Canceled.

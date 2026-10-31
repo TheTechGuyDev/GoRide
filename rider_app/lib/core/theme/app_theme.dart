@@ -10,7 +10,18 @@ class AppTheme {
   static ThemeData get light => _build(Brightness.light);
   static ThemeData get dark => _build(Brightness.dark);
 
+  /// Builds with AppColors switched to [brightness], then restores it.
   static ThemeData _build(Brightness brightness) {
+    final previous = AppColors.isDark;
+    AppColors.useDark(brightness == Brightness.dark);
+    try {
+      return _buildFor(brightness);
+    } finally {
+      AppColors.useDark(previous);
+    }
+  }
+
+  static ThemeData _buildFor(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkBackground : AppColors.background;
     final text = isDark ? Colors.white : AppColors.textPrimary;
@@ -26,7 +37,7 @@ class AppTheme {
         seedColor: AppColors.primary,
         brightness: brightness,
         primary: AppColors.primary,
-        surface: bg,
+        surface: isDark ? AppColors.darkSurface : bg,
         error: AppColors.error,
       ),
     );
@@ -54,7 +65,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: field,
-        hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
+        hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
           vertical: 18,

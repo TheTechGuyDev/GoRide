@@ -80,7 +80,7 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
                       showCheckmark: false,
                       onSelected: (_) => setState(() => _filter = f),
                       selectedColor: AppColors.primary,
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.surface,
                       labelStyle: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: filter == f
@@ -172,7 +172,7 @@ class _RideTile extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     formatDateTimeShort(record.createdAt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
@@ -304,7 +304,7 @@ class _ScheduledList extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       formatDateTimeShort(r.pickupAt).split(' · ').first,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
                       ),
@@ -449,9 +449,9 @@ class _Empty extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.receipt_long, size: 56, color: AppColors.textHint),
+          Icon(Icons.receipt_long, size: 56, color: AppColors.textHint),
           const SizedBox(height: 12),
-          Text(text, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(text, style: TextStyle(color: AppColors.textSecondary)),
         ],
       ),
     );

@@ -120,6 +120,9 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
                         TileLayer(
                           urlTemplate: MapConfig.tileUrl,
                           userAgentPackageName: MapConfig.userAgent,
+                          tileBuilder: AppColors.isDark
+                              ? darkModeTileBuilder
+                              : null,
                         ),
                         if (route != null)
                           PolylineLayer(
@@ -238,7 +241,7 @@ class _OptionsPanel extends ConsumerWidget {
         promo?.discountFor(booking.rideTypeId, selectedFare) ?? 0;
 
     return Container(
-      color: Colors.white,
+      color: AppColors.surface,
       child: Column(
         children: [
           // Drag handle: tap to expand / collapse the list.
@@ -268,7 +271,7 @@ class _OptionsPanel extends ConsumerWidget {
                     children: [
                       Text(
                         '${route.km.toStringAsFixed(1)} km · about ${route.minutes} min',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -507,7 +510,7 @@ class _RideTypeCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.schedule,
                           size: 13,
                           color: AppColors.textSecondary,
@@ -515,13 +518,13 @@ class _RideTypeCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Text(
                           '${type.etaMinutes.$1}-${type.etaMinutes.$2} mins',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Icon(
+                        Icon(
                           Icons.person_outline,
                           size: 13,
                           color: AppColors.textSecondary,
@@ -529,7 +532,7 @@ class _RideTypeCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Text(
                           '${type.passengers}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
@@ -565,7 +568,7 @@ class _RideTypeCard extends StatelessWidget {
                   if (discount > 0)
                     Text(
                       naira(fare),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textHint,
                         decoration: TextDecoration.lineThrough,
@@ -577,7 +580,7 @@ class _RideTypeCard extends StatelessWidget {
                 visualDensity: VisualDensity.compact,
                 tooltip: 'How is this fare calculated?',
                 onPressed: onInfo,
-                icon: const Icon(
+                icon: Icon(
                   Icons.info_outline,
                   size: 18,
                   color: AppColors.textHint,
@@ -601,7 +604,7 @@ void _showFareBreakdown(
   final f = type.fareFor(route);
   showModalBottomSheet<void>(
     context: context,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -619,7 +622,7 @@ void _showFareBreakdown(
             const SizedBox(height: 4),
             Text(
               type.description,
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
             _line('Base fare', naira(f.base)),
@@ -638,7 +641,7 @@ void _showFareBreakdown(
             const Divider(height: 28),
             _line('Total', naira(f.total - discount), bold: true),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Rounded to the nearest ₦50. The final fare only changes if the route or stops change significantly.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
@@ -704,7 +707,7 @@ class _RowLink extends StatelessWidget {
             const Spacer(),
             trailing,
             const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -744,7 +747,7 @@ class _TripCard extends StatelessWidget {
     );
 
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       elevation: 3,
       shadowColor: Colors.black26,
       borderRadius: BorderRadius.circular(14),
@@ -771,8 +774,8 @@ class _Calculating extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Colors.white,
+    return ColoredBox(
+      color: AppColors.surface,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -798,7 +801,7 @@ class _CircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       shape: const CircleBorder(),
       elevation: 3,
       shadowColor: Colors.black26,

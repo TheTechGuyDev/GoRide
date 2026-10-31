@@ -54,10 +54,7 @@ class DriverInfoScreen extends ConsumerWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -67,7 +64,7 @@ class DriverInfoScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 9),
       child: Row(
         children: [
-          Text(a, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(a, style: TextStyle(color: AppColors.textSecondary)),
           const Spacer(),
           Text(b, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
@@ -75,7 +72,7 @@ class DriverInfoScreen extends ConsumerWidget {
     );
 
     BoxDecoration card() => BoxDecoration(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(color: AppColors.border),
     );
@@ -106,10 +103,10 @@ class DriverInfoScreen extends ConsumerWidget {
                 const SizedBox(height: 6),
                 Text(
                   d.maskedPhone,
-                  style: const TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 4),
-                const Text(
+                Text(
                   'Calls and chats are routed through GoRide to protect both numbers',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11, color: AppColors.textHint),

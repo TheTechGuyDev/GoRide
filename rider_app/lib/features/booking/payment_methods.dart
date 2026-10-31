@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/notifications/notification_service.dart';
+import '../../core/router/routes.dart';
+import '../../core/utils/money.dart';
 import '../wallet/wallet_transactions.dart';
 
 enum PaymentKind { wallet, cash, card, transfer }
@@ -59,6 +62,16 @@ class WalletController extends Notifier<int> {
   }) {
     state = state + amount;
     _log(amount, type, title, method, reference: reference, id: id);
+    if (type == WalletTxType.topUp) {
+      ref
+          .read(notificationsProvider.notifier)
+          .notify(
+            NotifyCategory.wallet,
+            'Wallet topped up',
+            '${naira(amount)} added. New balance: ${naira(state)}.',
+            route: Routes.wallet,
+          );
+    }
   }
 
   void _log(

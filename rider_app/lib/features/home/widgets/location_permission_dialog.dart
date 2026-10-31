@@ -36,7 +36,7 @@ Future<bool> showLocationPermissionDialog(BuildContext context) async {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 14),
-            const Text(
+            Text(
               'To be able to use the service, we require permission to access your location.',
               textAlign: TextAlign.center,
               style: TextStyle(

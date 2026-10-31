@@ -232,7 +232,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  const Center(
+                  Center(
                     child: Text(
                       'Preview mode: any 4 digits will work',
                       style: TextStyle(fontSize: 13, color: AppColors.textHint),

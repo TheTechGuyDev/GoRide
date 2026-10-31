@@ -115,7 +115,7 @@ class _SchedulingScreenState extends ConsumerState<SchedulingScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'Your fare is locked in. We\'ll notify you when a driver accepts, '
                           'and again when they\'re on the way. You can see scheduled rides in Activity.',
                           textAlign: TextAlign.center,

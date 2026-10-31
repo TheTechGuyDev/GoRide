@@ -68,7 +68,7 @@ class RideDetailsScreen extends ConsumerWidget {
     final canceled = r.status == RideStatus.canceled;
 
     BoxDecoration card() => BoxDecoration(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: AppColors.border),
     );
@@ -77,7 +77,7 @@ class RideDetailsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Text(a, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(a, style: TextStyle(color: AppColors.textSecondary)),
           const Spacer(),
           b,
         ],
@@ -101,7 +101,7 @@ class RideDetailsScreen extends ConsumerWidget {
         children: [
           val(t),
           const SizedBox(width: 6),
-          const Icon(Icons.copy, size: 15, color: AppColors.textSecondary),
+          Icon(Icons.copy, size: 15, color: AppColors.textSecondary),
         ],
       ),
     );
@@ -153,7 +153,7 @@ class RideDetailsScreen extends ConsumerWidget {
                       const SizedBox(height: 3),
                       Text(
                         '${r.km.toStringAsFixed(1)} km · ${r.minutes} mins',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
@@ -223,7 +223,7 @@ class RideDetailsScreen extends ConsumerWidget {
                         const SizedBox(height: 3),
                         Text(
                           r.driver!.vehicleLine,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),

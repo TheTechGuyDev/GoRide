@@ -30,7 +30,7 @@ class AuthHeader extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           subtitle,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             height: 1.5,
             color: AppColors.textSecondary,
@@ -135,7 +135,7 @@ class OrDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
         Expanded(child: Divider()),
         Padding(
@@ -184,7 +184,7 @@ class SocialButton extends StatelessWidget {
           );
         },
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: AppColors.border),
           shape: const StadiumBorder(),
           foregroundColor: Theme.of(context).colorScheme.onSurface,
         ),

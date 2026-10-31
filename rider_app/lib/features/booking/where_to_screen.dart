@@ -387,7 +387,7 @@ class _Chip extends StatelessWidget {
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
           shape: const StadiumBorder(),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: AppColors.border),
           foregroundColor: AppColors.textPrimary,
           padding: const EdgeInsets.symmetric(horizontal: 14),
         ),
@@ -497,7 +497,7 @@ class _PlaceList extends ConsumerWidget {
                         p.address,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
@@ -555,7 +555,7 @@ class _EmptyState extends StatelessWidget {
           Text(
             text,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.textSecondary, height: 1.5),
+            style: TextStyle(color: AppColors.textSecondary, height: 1.5),
           ),
           const SizedBox(height: 12),
           TextButton(

@@ -50,7 +50,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
     ];
 
     BoxDecoration card() => BoxDecoration(
-      color: Colors.white,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: AppColors.border),
     );
@@ -58,7 +58,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Text(a, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(a, style: TextStyle(color: AppColors.textSecondary)),
           const Spacer(),
           b,
         ],
@@ -79,7 +79,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
         children: [
           val(t),
           const SizedBox(width: 6),
-          const Icon(Icons.copy, size: 15, color: AppColors.textSecondary),
+          Icon(Icons.copy, size: 15, color: AppColors.textSecondary),
         ],
       ),
     );
@@ -157,7 +157,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
                 const SizedBox(height: 6),
                 Text(
                   '${days[r.pickupAt.weekday - 1]}, ${formatDate(r.pickupAt)} · ${formatTime(r.pickupAt)}',
-                  style: const TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
                 if (r.driver == null) ...[
                   const SizedBox(height: 14),
@@ -252,7 +252,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.sticky_note_2_outlined,
                         size: 16,
                         color: AppColors.textSecondary,
@@ -261,9 +261,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           r.pickupNote,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                          ),
+                          style: TextStyle(color: AppColors.textSecondary),
                         ),
                       ),
                     ],
@@ -308,7 +306,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
                         const SizedBox(height: 3),
                         Text(
                           r.driver!.vehicleLine,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
@@ -378,10 +376,7 @@ class ScheduledRideDetailsScreen extends ConsumerWidget {
                 ? 'Free cancellation until ${formatTime(r.pickupAt.subtract(ScheduledRidesController.freeCancelBefore))} on ${formatDate(r.pickupAt)}.'
                 : 'Pickup is less than 1 hour away.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
           AppButton(

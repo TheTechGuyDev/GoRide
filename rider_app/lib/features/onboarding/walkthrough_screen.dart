@@ -113,7 +113,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
                               Text(
                                 s.body,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
                                   height: 1.5,
                                   color: AppColors.textSecondary,

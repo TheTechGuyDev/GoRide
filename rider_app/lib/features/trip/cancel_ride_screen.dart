@@ -139,7 +139,7 @@ class RideCanceledScreen extends ConsumerWidget {
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 14),
-                const Text(
+                Text(
                   'You were not charged for this ride. You can see your cancellation history in the Activity tab.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textSecondary, height: 1.5),

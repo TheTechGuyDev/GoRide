@@ -23,8 +23,8 @@ class HomeShell extends StatelessWidget {
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: SafeArea(
@@ -95,7 +95,7 @@ class ComingSoonTab extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               '$title is coming in a later step',
-              style: const TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ),

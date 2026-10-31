@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'more_screens.dart';
+
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
@@ -36,7 +38,7 @@ class AccountTab extends ConsumerWidget {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(16),
             ),
@@ -97,7 +99,7 @@ class AccountTab extends ConsumerWidget {
                     onPressed: () => context.push(Routes.topUp),
                     style: OutlinedButton.styleFrom(
                       shape: const StadiumBorder(),
-                      side: const BorderSide(color: AppColors.border),
+                      side: BorderSide(color: AppColors.border),
                       foregroundColor: AppColors.textPrimary,
                     ),
                     child: const Text(
@@ -149,9 +151,37 @@ class AccountTab extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Appearance, language, help & support, referrals and log out arrive in the next step.',
+          _Group(
+            items: [
+              _Item(
+                Icons.palette_outlined,
+                'App Appearance',
+                Routes.appearance,
+              ),
+              _Item(Icons.card_giftcard, 'Invite Friends', Routes.referral),
+              _Item(Icons.help_outline, 'Help & Support', Routes.help),
+              _Item(
+                Icons.description_outlined,
+                'Privacy Policy',
+                Routes.privacyPolicy,
+              ),
+              _Item(Icons.gavel_outlined, 'Terms of Service', Routes.terms),
+              _Item(Icons.star_outline, 'Rate GoRide', null, onTap: showRateUs),
+            ],
+          ),
+          _Group(
+            items: [
+              _Item(
+                Icons.logout,
+                'Logout',
+                null,
+                danger: true,
+                onTap: (c) => confirmLogout(c, ref),
+              ),
+            ],
+          ),
+          Text(
+            'GoRide 1.0.0 (preview)',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),
@@ -162,10 +192,18 @@ class AccountTab extends ConsumerWidget {
 }
 
 class _Item {
-  const _Item(this.icon, this.label, this.route);
+  const _Item(
+    this.icon,
+    this.label,
+    this.route, {
+    this.onTap,
+    this.danger = false,
+  });
   final IconData icon;
   final String label;
-  final String route;
+  final String? route;
+  final void Function(BuildContext)? onTap;
+  final bool danger;
 }
 
 class _Group extends StatelessWidget {
@@ -177,7 +215,7 @@ class _Group extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(16),
       ),
@@ -185,13 +223,21 @@ class _Group extends StatelessWidget {
         children: [
           for (final i in items)
             ListTile(
-              leading: Icon(i.icon, color: AppColors.textPrimary),
+              leading: Icon(
+                i.icon,
+                color: i.danger ? AppColors.error : AppColors.textPrimary,
+              ),
               title: Text(
                 i.label,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: i.danger ? AppColors.error : null,
+                ),
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(i.route),
+              trailing: i.danger ? null : const Icon(Icons.chevron_right),
+              onTap: () => i.route != null
+                  ? context.push(i.route!)
+                  : i.onTap?.call(context),
             ),
         ],
       ),

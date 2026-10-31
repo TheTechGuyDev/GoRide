@@ -82,7 +82,7 @@ class EmergencyContactsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           if (contacts.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Center(
                 child: Text(
@@ -158,7 +158,7 @@ class EmergencyContactsScreen extends ConsumerWidget {
     final result = await showModalBottomSheet<EmergencyContact>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),

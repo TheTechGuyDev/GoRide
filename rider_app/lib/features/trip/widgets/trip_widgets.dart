@@ -79,7 +79,7 @@ class DriverRow extends StatelessWidget {
                         style: const TextStyle(fontSize: 12),
                       ),
                       const SizedBox(width: 10),
-                      const Icon(
+                      Icon(
                         Icons.phone_outlined,
                         size: 13,
                         color: AppColors.textSecondary,
@@ -89,7 +89,7 @@ class DriverRow extends StatelessWidget {
                         child: Text(
                           driver.maskedPhone,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
                           ),
@@ -187,7 +187,7 @@ Future<void> showSafetySheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -214,7 +214,7 @@ Future<void> showSafetySheet(
                 trip.driver == null
                     ? 'Trip ${trip.id}'
                     : '${trip.driver!.name} · ${trip.driver!.plate} · Trip ${trip.id}',
-                style: const TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 16),
               if (onSos != null)

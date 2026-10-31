@@ -91,7 +91,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
     final note = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -111,7 +111,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Help your driver find you: a landmark, gate or building colour.',
               style: TextStyle(color: AppColors.textSecondary),
             ),
@@ -188,6 +188,9 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                     TileLayer(
                       urlTemplate: MapConfig.tileUrl,
                       userAgentPackageName: MapConfig.userAgent,
+                      tileBuilder: AppColors.isDark
+                          ? darkModeTileBuilder
+                          : null,
                     ),
                     const SimpleAttributionWidget(
                       source: Text(MapConfig.attribution),
@@ -244,8 +247,8 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
 
           // Bottom panel
           Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
             child: SafeArea(
@@ -278,7 +281,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                         const SizedBox(width: 14),
                         Expanded(
                           child: _looking || _dragging
-                              ? const Text(
+                              ? Text(
                                   'Finding address...',
                                   style: TextStyle(
                                     color: AppColors.textSecondary,
@@ -302,7 +305,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                                       _place?.address ?? '',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
                                         color: AppColors.textSecondary,
                                       ),
@@ -371,7 +374,7 @@ class _CircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.surface,
       shape: const CircleBorder(),
       elevation: 3,
       shadowColor: Colors.black26,

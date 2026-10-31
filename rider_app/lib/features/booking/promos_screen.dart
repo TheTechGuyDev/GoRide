@@ -202,7 +202,7 @@ class _PromoTile extends StatelessWidget {
     return Opacity(
       opacity: disabled ? 0.5 : 1,
       child: Material(
-        color: Colors.white,
+        color: AppColors.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
@@ -241,7 +241,7 @@ class _PromoTile extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         disabledReason ?? promo.terms,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),

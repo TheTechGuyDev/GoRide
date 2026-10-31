@@ -155,7 +155,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const FieldLabel('Phone Number'),
             PhoneField(controller: _phone, readOnly: true),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'To change your number, go to Account & Security.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
@@ -426,7 +426,7 @@ class LinkedAccountsScreen extends ConsumerWidget {
             row('apple', Icons.apple, Colors.black, 'Apple'),
           ],
         ),
-        const Text(
+        Text(
           'Linked accounts let you sign in without an SMS code. Real linking starts with Supabase.',
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
@@ -488,7 +488,7 @@ class DataPrivacyScreen extends ConsumerWidget {
             ),
           ],
         ),
-        const Text(
+        Text(
           'Your rights under the Nigeria Data Protection Act 2023: access, correct, download or delete your data at any time.',
           style: TextStyle(
             fontSize: 12,

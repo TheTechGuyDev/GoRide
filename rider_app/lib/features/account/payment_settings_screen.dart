@@ -73,7 +73,7 @@ class PaymentSettingsScreen extends ConsumerWidget {
                 PopupMenuItem(value: 'remove', child: Text('Remove card')),
               ],
             ),
-            _ => const Text(
+            _ => Text(
               'Available',
               style: TextStyle(
                 color: AppColors.textSecondary,
@@ -84,7 +84,7 @@ class PaymentSettingsScreen extends ConsumerWidget {
           return Container(
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
             ),
@@ -116,7 +116,7 @@ class PaymentSettingsScreen extends ConsumerWidget {
                         m.kind == PaymentKind.wallet
                             ? 'Balance: ${naira(balance)}'
                             : m.subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
@@ -354,7 +354,7 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Paystack checks your card with a ₦50 charge that is refunded immediately. '
               'GoRide never stores your full card number. Preview: try 4084 0840 8408 4081.',
               style: TextStyle(

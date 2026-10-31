@@ -25,7 +25,7 @@ class WelcomeScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Let\'s dive in into your account',
                 style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
               ),
@@ -49,19 +49,16 @@ class WelcomeScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   TextButton(
-                    onPressed: () {},
-                    child: const Text(
+                    onPressed: () => context.push(Routes.privacyPolicy),
+                    child: Text(
                       'Privacy Policy',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
-                  const Text(
-                    '·',
-                    style: TextStyle(color: AppColors.textSecondary),
-                  ),
+                  Text('·', style: TextStyle(color: AppColors.textSecondary)),
                   TextButton(
-                    onPressed: () {},
-                    child: const Text(
+                    onPressed: () => context.push(Routes.terms),
+                    child: Text(
                       'Terms of Service',
                       style: TextStyle(color: AppColors.textSecondary),
                     ),

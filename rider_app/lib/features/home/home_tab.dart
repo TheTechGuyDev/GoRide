@@ -39,8 +39,8 @@ class _PanelShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
@@ -166,7 +166,7 @@ class _WhereToPanel extends ConsumerWidget {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () => context.push(Routes.whereTo),
-                  child: const SizedBox(
+                  child: SizedBox(
                     height: 56,
                     child: Row(
                       children: [
@@ -233,7 +233,7 @@ class _PlaceChip extends StatelessWidget {
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
         shape: const StadiumBorder(),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
         foregroundColor: AppColors.textPrimary,
         padding: const EdgeInsets.symmetric(horizontal: 18),
       ),

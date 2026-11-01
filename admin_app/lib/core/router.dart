@@ -85,8 +85,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           for (final s in Section.values)
             GoRoute(
               path: R.of(s),
-              pageBuilder: (_, _) => NoTransitionPage(
-                child: Guard(section: s, child: pageFor(s)),
+              pageBuilder: (_, st) => NoTransitionPage(
+                key: ValueKey(st.uri.toString()),
+                child: Guard(
+                  section: s,
+                  child: s == Section.trips
+                      ? TripsPage(
+                          initialQuery: st.uri.queryParameters['q'] ?? '',
+                        )
+                      : pageFor(s),
+                ),
               ),
               routes: [
                 if (s == Section.drivers)

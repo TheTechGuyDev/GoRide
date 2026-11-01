@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import 'admin/admin_pages.dart';
 import 'care/care_pages.dart';
 import 'drivers/drivers_pages.dart';
 import 'finance/finance_pages.dart';
 import 'overview/overview_page.dart';
-import 'placeholders.dart';
 import 'trips/trips_pages.dart';
 
 export 'drivers/drivers_pages.dart' show DriverDetailPage;
-export 'placeholders.dart';
 export 'trips/trips_pages.dart' show RiderDetailPage, TripsPage;
 
 Widget pageFor(Section s) => switch (s) {
@@ -24,5 +23,9 @@ Widget pageFor(Section s) => switch (s) {
   Section.pricing => const PricingPage(),
   Section.safety => const SafetyPage(),
   Section.support => const SupportPage(),
-  _ => ComingPage(section: s),
+  Section.promos => const PromosPage(),
+  Section.broadcasts => const BroadcastsPage(),
+  Section.staff => const StaffPage(),
+  Section.settings => const SettingsPage(),
+  Section.audit => const AuditPage(),
 };

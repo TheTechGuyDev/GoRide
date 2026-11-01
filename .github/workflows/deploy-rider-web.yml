@@ -1,10 +1,12 @@
-name: Deploy Rider App Preview
+name: Deploy App Previews
 
 on:
   push:
     branches: [main]
     paths:
       - 'rider_app/**'
+      - 'driver_app/**'
+      - 'packages/**'
       - '.github/workflows/deploy-rider-web.yml'
   workflow_dispatch:
 
@@ -20,20 +22,37 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: rider_app
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - run: flutter pub get
-      - run: flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
+
+      # Rider app at /GoRide/
+      - name: Build rider app
+        working-directory: rider_app
+        run: |
+          flutter pub get
+          flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
+
+      # Driver app at /GoRide/driver/
+      - name: Build driver app
+        working-directory: driver_app
+        run: |
+          flutter pub get
+          flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/driver/"
+
+      - name: Combine sites
+        run: |
+          mkdir -p site
+          cp -r rider_app/build/web/. site/
+          mkdir -p site/driver
+          cp -r driver_app/build/web/. site/driver/
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: rider_app/build/web
+          path: site
 
   deploy:
     needs: build

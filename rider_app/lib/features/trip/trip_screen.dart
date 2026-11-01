@@ -14,7 +14,6 @@ import '../../core/widgets/app_button.dart';
 import '../auth/auth_controller.dart';
 import '../booking/payment_methods.dart';
 import '../booking/ride_types.dart';
-import '../home/nearby_cars.dart';
 import '../home/widgets/map_markers.dart';
 import 'path_utils.dart';
 import 'trip_controller.dart';

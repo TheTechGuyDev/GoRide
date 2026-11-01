@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../location/location_controller.dart';
+import 'widgets/map_markers.dart';
 
-enum VehicleType { car, bike, keke }
+export 'widgets/map_markers.dart' show VehicleType;
+
 
 class NearbyVehicle {
   const NearbyVehicle({

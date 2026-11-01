@@ -31,14 +31,6 @@ class ComingPage extends StatelessWidget {
   }
 }
 
-class DriverDetailPage extends StatelessWidget {
-  const DriverDetailPage({super.key, required this.id});
-  final String id;
-  @override
-  Widget build(BuildContext context) =>
-      const ComingPage(section: Section.drivers);
-}
-
 class RiderDetailPage extends StatelessWidget {
   const RiderDetailPage({super.key, required this.id});
   final String id;

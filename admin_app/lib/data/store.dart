@@ -716,7 +716,9 @@ class AdminStore extends Notifier<AdminData> {
           online: status == DriverStatus.active && r.nextInt(5) < 2,
           wallet: status == DriverStatus.pending ? 0 : -4000 + r.nextInt(30000),
           lastSeen: now.subtract(Duration(minutes: r.nextInt(3000))),
-          paidUntil: sub ? now.add(Duration(days: r.nextInt(9) - 1)) : null,
+          paidUntil: sub && status == DriverStatus.active
+              ? now.add(Duration(days: r.nextInt(9) - 1))
+              : null,
           suspendReason: status == DriverStatus.suspended
               ? pick([
                   'Rating below 4.2',

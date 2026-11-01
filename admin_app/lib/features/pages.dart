@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/models.dart';
+import 'care/care_pages.dart';
 import 'drivers/drivers_pages.dart';
 import 'finance/finance_pages.dart';
 import 'overview/overview_page.dart';
@@ -21,5 +22,7 @@ Widget pageFor(Section s) => switch (s) {
   Section.revenue => const RevenuePage(),
   Section.payouts => const PayoutsPage(),
   Section.pricing => const PricingPage(),
+  Section.safety => const SafetyPage(),
+  Section.support => const SupportPage(),
   _ => ComingPage(section: s),
 };

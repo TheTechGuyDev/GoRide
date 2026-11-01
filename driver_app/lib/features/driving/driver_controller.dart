@@ -11,7 +11,6 @@ import '../../core/notifications/notification_service.dart';
 import '../earnings/earnings_controller.dart';
 import '../registration/plans.dart';
 import '../registration/registration_controller.dart';
-import 'lagos_places.dart';
 
 /// A ride offered to this driver. Later: a row in `ride_requests`,
 /// delivered over Supabase Realtime.

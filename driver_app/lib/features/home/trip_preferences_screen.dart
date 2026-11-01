@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:goride_core/goride_core.dart';
 
 import '../driving/driver_controller.dart';
-import '../driving/lagos_places.dart';
 import '../registration/registration_controller.dart';
 
 /// What kind of requests the driver wants.

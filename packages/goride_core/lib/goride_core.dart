@@ -22,3 +22,4 @@ export 'src/widgets/web_preview_frame.dart';
 export 'src/widgets/form_widgets.dart';
 export 'src/widgets/settings_widgets.dart';
 export 'src/widgets/appearance_screen.dart';
+export 'src/models/lagos_places.dart';

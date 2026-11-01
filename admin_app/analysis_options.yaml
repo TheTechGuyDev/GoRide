@@ -1,0 +1,10 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+    - web/**
+
+linter:
+  rules:
+    curly_braces_in_flow_control_structures: false

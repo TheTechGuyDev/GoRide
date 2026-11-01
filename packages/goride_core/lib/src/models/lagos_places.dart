@@ -1,4 +1,4 @@
-import 'package:goride_core/goride_core.dart';
+import 'place.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Real Lagos spots used to simulate ride requests in the preview.

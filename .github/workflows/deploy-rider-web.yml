@@ -6,6 +6,7 @@ on:
     paths:
       - 'rider_app/**'
       - 'driver_app/**'
+      - 'admin_app/**'
       - 'packages/**'
       - '.github/workflows/deploy-rider-web.yml'
   workflow_dispatch:
@@ -43,12 +44,21 @@ jobs:
           flutter pub get
           flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/driver/"
 
+      # Admin dashboard at /GoRide/admin/
+      - name: Build admin dashboard
+        working-directory: admin_app
+        run: |
+          flutter pub get
+          flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/admin/"
+
       - name: Combine sites
         run: |
           mkdir -p site
           cp -r rider_app/build/web/. site/
           mkdir -p site/driver
           cp -r driver_app/build/web/. site/driver/
+          mkdir -p site/admin
+          cp -r admin_app/build/web/. site/admin/
 
       - uses: actions/upload-pages-artifact@v3
         with:

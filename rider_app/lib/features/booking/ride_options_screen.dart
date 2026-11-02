@@ -17,6 +17,7 @@ import '../schedule/scheduled_rides.dart';
 import '../trip/trip_controller.dart';
 import '../../core/utils/dates.dart';
 import 'booking_controller.dart';
+import 'fare_quotes.dart';
 import 'payment_methods.dart';
 import 'ride_types.dart';
 
@@ -48,7 +49,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
 
   void _book(RouteInfo route) {
     final booking = ref.read(bookingControllerProvider);
-    final fare = booking.rideType.fareFor(route).total;
+    final fare = fareOf(quotesFor(ref, route), booking.rideType, route);
     final discount = booking.promo?.discountFor(booking.rideTypeId, fare) ?? 0;
     final payable = fare - discount;
 
@@ -236,7 +237,8 @@ class _OptionsPanel extends ConsumerWidget {
       orElse: () => methods.first,
     );
     final promo = booking.promo;
-    final selectedFare = booking.rideType.fareFor(route).total;
+    final quotes = quotesFor(ref, route);
+    final selectedFare = fareOf(quotes, booking.rideType, route);
     final selectedDiscount =
         promo?.discountFor(booking.rideTypeId, selectedFare) ?? 0;
 
@@ -305,7 +307,7 @@ class _OptionsPanel extends ConsumerWidget {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
                 final type = rideTypes[i];
-                final fare = type.fareFor(route).total;
+                final fare = fareOf(quotes, type, route);
                 final discount = promo?.discountFor(type.id, fare) ?? 0;
                 return _RideTypeCard(
                   type: type,
@@ -315,8 +317,13 @@ class _OptionsPanel extends ConsumerWidget {
                   onTap: () => ref
                       .read(bookingControllerProvider.notifier)
                       .selectRideType(type.id),
-                  onInfo: () =>
-                      _showFareBreakdown(context, type, route, discount),
+                  onInfo: () => _showFareBreakdown(
+                    context,
+                    type,
+                    route,
+                    discount,
+                    quotes[type.id],
+                  ),
                 );
               },
             ),
@@ -600,8 +607,10 @@ void _showFareBreakdown(
   RideType type,
   RouteInfo route,
   int discount,
+  FareQuote? q,
 ) {
   final f = type.fareFor(route);
+  final total = q?.fare ?? f.total;
   showModalBottomSheet<void>(
     context: context,
     backgroundColor: AppColors.surface,
@@ -625,21 +634,48 @@ void _showFareBreakdown(
               style: TextStyle(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
-            _line('Base fare', naira(f.base)),
-            _line(
-              'Distance (${route.km.toStringAsFixed(1)} km × ${naira(type.perKm)})',
-              naira(f.distance),
-            ),
-            _line(
-              'Time (${route.minutes} min × ${naira(type.perMinute)})',
-              naira(f.time),
-            ),
-            if (f.minimumTopUp > 0)
-              _line('Minimum fare adjustment', naira(f.minimumTopUp)),
+            if (q == null) ...[
+              _line('Base fare', naira(f.base)),
+              _line(
+                'Distance (${route.km.toStringAsFixed(1)} km × ${naira(type.perKm)})',
+                naira(f.distance),
+              ),
+              _line(
+                'Time (${route.minutes} min × ${naira(type.perMinute)})',
+                naira(f.time),
+              ),
+              if (f.minimumTopUp > 0)
+                _line('Minimum fare adjustment', naira(f.minimumTopUp)),
+            ] else ...[
+              _line(
+                'Base fare${q.city.isEmpty || q.city == 'Default' ? '' : ' (${q.city})'}',
+                naira(q.base.toDouble()),
+              ),
+              _line(
+                'Distance (${route.km.toStringAsFixed(1)} km × ${naira(q.perKm.toDouble())})',
+                naira(route.km * q.perKm),
+              ),
+              _line(
+                'Time (${q.minutes} min × ${naira(q.perMinute.toDouble())})',
+                naira(q.minutes * q.perMinute.toDouble()),
+              ),
+              if (q.rushHour) _line('Rush hour', 'Traffic time included'),
+              if (q.surge > 1) _line('Busy area', '${q.surge}× (max 1.3×)'),
+              if (q.airportFee > 0)
+                _line(
+                  'Airport fee${q.airport == null ? '' : ' (${q.airport})'}',
+                  naira(q.airportFee.toDouble()),
+                ),
+              if (q.pickupFee > 0)
+                _line(
+                  'Long pickup (${q.pickupKm} km away)',
+                  naira(q.pickupFee.toDouble()),
+                ),
+            ],
             if (discount > 0)
               _line('Promo discount', '-${naira(discount)}', green: true),
             const Divider(height: 28),
-            _line('Total', naira(f.total - discount), bold: true),
+            _line('Total', naira((total - discount).toDouble()), bold: true),
             const SizedBox(height: 12),
             Text(
               'Rounded to the nearest ₦50. The final fare only changes if the route or stops change significantly.',

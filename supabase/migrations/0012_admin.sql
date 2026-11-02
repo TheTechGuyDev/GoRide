@@ -69,6 +69,8 @@ begin
     'pricing', (select coalesce(jsonb_agg(to_jsonb(r) order by r.sort), '[]') from ride_types r),
     'plans', (select coalesce(jsonb_agg(to_jsonb(p)), '[]') from plan_prices p),
     'settings', (select to_jsonb(s) from app_settings s where id = 1),
+    'cities', (select coalesce(jsonb_agg(c.name order by c.name), '[]') from cities c where c.active),
+    'city_rates', (select coalesce(jsonb_agg(to_jsonb(r)), '[]') from city_rates r),
     'online', (select count(*) from driver_locations where online and updated_at > now() - interval '2 minutes')
   );
 end $$;

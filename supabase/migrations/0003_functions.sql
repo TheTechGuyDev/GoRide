@@ -137,7 +137,7 @@ begin
     raise exception 'You already have a trip in progress';
   end if;
 
-  select * into q from quote_fare(p_ride_type, p_km, p_minutes, p_pickup_lat, p_pickup_lng);
+  select * into q from quote_fare(p_ride_type, p_km, p_minutes, p_pickup_lat, p_pickup_lng, p_dropoff_lat, p_dropoff_lng);
 
   if p_promo is not null and p_promo <> '' then
     select * into pr from promos where code = upper(p_promo) and active
@@ -161,10 +161,11 @@ begin
 
   insert into trips (rider_id, ride_type_id, status, pickup_address, pickup_lat, pickup_lng,
     dropoff_address, dropoff_lat, dropoff_lng, stops, route, distance_km, duration_min,
-    surge, fare, discount, promo_code, payment, scheduled_for)
+    surge, fare, discount, promo_code, payment, scheduled_for, city, breakdown)
   values (me.id, p_ride_type, (case when p_scheduled_for is null then 'requested' else 'scheduled' end)::trip_status,
     p_pickup_address, p_pickup_lat, p_pickup_lng, p_dropoff_address, p_dropoff_lat, p_dropoff_lng,
-    p_stops, p_route, p_km, p_minutes, q.surge, q.fare, disc, pr.code, p_payment, p_scheduled_for)
+    p_stops, p_route, p_km, p_minutes, q.surge, q.fare, disc, pr.code, p_payment, p_scheduled_for,
+    q.breakdown->>'city', q.breakdown)
   returning * into t;
   return t;
 end $$;

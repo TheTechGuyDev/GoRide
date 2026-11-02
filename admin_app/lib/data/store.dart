@@ -181,6 +181,37 @@ final sessionProvider = NotifierProvider<SessionController, StaffMember?>(
   SessionController.new,
 );
 
+/// Prices that differ by city (`city_rates`); other cities use the
+/// default prices.
+class CityRates {
+  const CityRates({this.cities = const [], this.rates = const {}});
+  final List<String> cities;
+
+  /// city -> ride type id -> prices.
+  final Map<String, Map<String, RidePricing>> rates;
+}
+
+class CityRatesController extends Notifier<CityRates> {
+  @override
+  CityRates build() => const CityRates();
+  void set(CityRates v) => state = v;
+}
+
+final cityRatesProvider = NotifierProvider<CityRatesController, CityRates>(
+  CityRatesController.new,
+);
+
+/// Which city the Pricing page is editing (null = default prices).
+class PricingCityController extends Notifier<String?> {
+  @override
+  String? build() => null;
+  void set(String? c) => state = c;
+}
+
+final pricingCityProvider = NotifierProvider<PricingCityController, String?>(
+  PricingCityController.new,
+);
+
 /// Last server error, shown as a message by the dashboard shell.
 class StoreErrorController extends Notifier<String?> {
   @override
@@ -269,6 +300,30 @@ class AdminStore extends Notifier<AdminData> {
         ..addAll(snap.docTypes);
       onlineDrivers = snap.onlineCount;
       state = snap.data;
+      final names = {for (final p in snap.data.pricing) p.id: p.name};
+      final rates = <String, Map<String, RidePricing>>{};
+      for (final r in (j['city_rates'] as List? ?? const [])) {
+        final m = Map<String, dynamic>.from(r as Map);
+        final id = m['ride_type_id'] as String;
+        (rates[m['city'] as String] ??= {})[id] = RidePricing(
+          id: id,
+          name: names[id] ?? id,
+          baseFare: (m['base_fare'] as num).toDouble(),
+          perKm: (m['per_km'] as num).toDouble(),
+          perMinute: (m['per_minute'] as num).toDouble(),
+          minimumFare: (m['minimum_fare'] as num).toDouble(),
+        );
+      }
+      ref
+          .read(cityRatesProvider.notifier)
+          .set(
+            CityRates(
+              cities: [
+                for (final c in (j['cities'] as List? ?? const [])) c as String,
+              ],
+              rates: rates,
+            ),
+          );
     } catch (e) {
       ref.read(storeErrorProvider.notifier).set(AuthService.message(e));
     }
@@ -614,6 +669,33 @@ class AdminStore extends Notifier<AdminData> {
           })
           .eq('id', p.id),
       audit: 'Updated ${p.name} prices',
+    );
+  }
+
+  /// Prices for one city (overrides the default prices there).
+  void saveCityPricing(String city, RidePricing p) {
+    _server(
+      () => Backend.db.from('city_rates').upsert({
+        'city': city,
+        'ride_type_id': p.id,
+        'base_fare': p.baseFare,
+        'per_km': p.perKm,
+        'per_minute': p.perMinute,
+        'minimum_fare': p.minimumFare,
+      }),
+      audit: 'Updated ${p.name} prices in $city',
+    );
+  }
+
+  /// Back to the default prices in this city.
+  void resetCityPricing(String city, String rideTypeId) {
+    _server(
+      () => Backend.db
+          .from('city_rates')
+          .delete()
+          .eq('city', city)
+          .eq('ride_type_id', rideTypeId),
+      audit: 'Reset $rideTypeId prices in $city to default',
     );
   }
 

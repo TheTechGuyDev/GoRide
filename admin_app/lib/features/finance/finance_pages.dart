@@ -440,6 +440,12 @@ class PricingPage extends ConsumerWidget {
     final data = ref.watch(storeProvider);
     final s = data.settings;
     final store = ref.read(storeProvider.notifier);
+    final cityRates = ref.watch(cityRatesProvider);
+    final city = ref.watch(pricingCityProvider);
+    final overrides = city == null
+        ? const <String, RidePricing>{}
+        : (cityRates.rates[city] ?? const {});
+    final shown = [for (final p in data.pricing) overrides[p.id] ?? p];
 
     return PageBody(
       children: [
@@ -447,9 +453,33 @@ class PricingPage extends ConsumerWidget {
           title: 'Pricing and plans',
           subtitle: 'Changes reach the rider and driver apps immediately, no app update needed',
         ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ChoiceChip(
+              label: const Text('Default (launch cities)'),
+              selected: city == null,
+              onSelected: (_) =>
+                  ref.read(pricingCityProvider.notifier).set(null),
+            ),
+            for (final c in cityRates.cities)
+              ChoiceChip(
+                label: Text(
+                  cityRates.rates.containsKey(c) ? '$c (own prices)' : c,
+                ),
+                selected: city == c,
+                onSelected: (_) =>
+                    ref.read(pricingCityProvider.notifier).set(c),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Panel(
-          title: 'Fares',
-          subtitle: 'Fare = base + (per km x distance) + (per minute x time), never below the minimum. Example: 8 km, 25 min',
+          title: city == null ? 'Fares' : 'Fares in $city',
+          subtitle: city == null
+              ? 'Used in every city without its own prices. Fare = base + (per km x distance) + (per minute x time), never below the minimum. Rush hour adds traffic time, busy areas up to 1.3x, plus airport and long-pickup fees. Example: 8 km, 25 min'
+              : 'Edit a service to give $city its own price. Services without their own price use the default. Example: 8 km, 25 min',
           flushBody: true,
           child: DataGrid(
             minWidth: 900,
@@ -464,7 +494,7 @@ class PricingPage extends ConsumerWidget {
               '',
             ],
             rows: [
-              for (final p in data.pricing)
+              for (final p in shown)
                 [
                   Row(
                     children: [
@@ -516,9 +546,16 @@ class PricingPage extends ConsumerWidget {
                         builder: (_) => _PricingDialog(p: p),
                       );
                       if (updated != null) {
-                        store.savePricing(updated);
+                        if (city == null) {
+                          store.savePricing(updated);
+                        } else {
+                          store.saveCityPricing(city, updated);
+                        }
                         if (context.mounted)
-                          toast(context, '${p.name} prices updated');
+                          toast(
+                            context,
+                            '${p.name} prices updated${city == null ? '' : ' in $city'}',
+                          );
                       }
                     },
                   ),

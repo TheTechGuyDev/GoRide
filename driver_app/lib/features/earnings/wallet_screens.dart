@@ -478,6 +478,22 @@ class _SettleScreenState extends ConsumerState<SettleScreen> {
   int get _value => int.tryParse(_amount.text) ?? 0;
 
   Future<void> _pay() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Top-up coming soon'),
+        content: const Text(
+          'Wallet top-ups go live as soon as Paystack is connected. For now, an admin can add money to your wallet from the GoRide dashboard.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+    if (_gateway.isTestMode) return;
     setState(() => _busy = true);
     final res = await _gateway.chargeCard(amount: _value);
     if (!mounted) return;

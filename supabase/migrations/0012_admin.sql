@@ -18,12 +18,12 @@ begin
       ) order by d.created_at desc), '[]') from drivers d join profiles p on p.id = d.id
       left join driver_locations l on l.driver_id = d.id where d.status <> 'draft'),
     'riders', (select coalesce(jsonb_agg(jsonb_build_object(
-        'id', p.id, 'name', p.full_name, 'phone', p.phone, 'email', p.email, 'rating', p.rating,
+        'id', p.id, 'name', coalesce(nullif(p.full_name, ''), p.email), 'phone', p.phone, 'email', p.email, 'rating', p.rating,
         'joined', p.created_at, 'blocked', p.blocked, 'wallet', wallet_balance(p.id),
         'trips', (select count(*) from trips t where t.rider_id = p.id and t.status = 'completed'),
         'spent', (select coalesce(sum(t.total_fare - t.refunded), 0) from trips t where t.rider_id = p.id and t.status = 'completed'),
         'contacts', (select count(*) from emergency_contacts c where c.user_id = p.id)
-      ) order by p.created_at desc), '[]') from profiles p where p.role = 'rider'),
+      ) order by p.created_at desc), '[]') from profiles p),
     'trips', (select coalesce(jsonb_agg(jsonb_build_object(
         'id', t.id, 'code', t.code, 'rider_id', t.rider_id, 'rider', rp.full_name, 'driver_id', t.driver_id, 'driver', dp.full_name,
         'pickup', t.pickup_address, 'dropoff', t.dropoff_address, 'ride_type_id', t.ride_type_id,

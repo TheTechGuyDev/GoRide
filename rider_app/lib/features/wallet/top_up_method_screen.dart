@@ -82,6 +82,24 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
 
   Future<void> _confirm() async {
     final gateway = ref.read(paymentGatewayProvider);
+    if (gateway is SimulatedPaystack) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Top-up coming soon'),
+          content: const Text(
+            'Wallet top-ups go live as soon as Paystack is connected. For now, an admin can add money to your wallet from the GoRide dashboard.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     TopUpResult? result;
 
     switch (_method) {

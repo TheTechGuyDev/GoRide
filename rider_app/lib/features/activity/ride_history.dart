@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart'
+    show Backend, parseTime, userIdProvider;
 import 'package:latlong2/latlong.dart';
 
 import '../booking/place.dart';
@@ -107,8 +109,66 @@ class RideRecord {
 }
 
 class RideHistoryController extends Notifier<List<RideRecord>> {
+  /// Past trips from Supabase (`my_rides`).
   @override
-  List<RideRecord> build() => _seed();
+  List<RideRecord> build() {
+    final uid = ref.watch(userIdProvider);
+    if (uid == null) return const [];
+    Future.microtask(refresh);
+    return const [];
+  }
+
+  Future<void> refresh() async {
+    try {
+      final rows = await Backend.db.rpc('my_rides');
+      state = [
+        for (final r in (rows as List))
+          _fromRow(Map<String, dynamic>.from(r as Map)),
+      ];
+    } catch (_) {}
+  }
+
+  static RideRecord _fromRow(Map<String, dynamic> t) {
+    final id = t['id'] as String;
+    final code = t['code'] as String;
+    final driver = t['driver'] == null
+        ? null
+        : Driver.fromJson(Map<String, dynamic>.from(t['driver'] as Map));
+    return RideRecord(
+      id: id,
+      bookingId: code,
+      transactionId: 'TRX${code.substring(2)}',
+      status: t['status'] == 'completed'
+          ? RideStatus.completed
+          : RideStatus.canceled,
+      rideTypeId: t['ride_type_id'] as String,
+      pickupName: t['pickup_address'] as String,
+      destination: Place(
+        id: 'dest-$id',
+        name: t['dropoff_address'] as String,
+        address: t['dropoff_address'] as String,
+        position: LatLng(
+          (t['dropoff_lat'] as num).toDouble(),
+          (t['dropoff_lng'] as num).toDouble(),
+        ),
+      ),
+      paymentId: t['payment'] == 'cash' ? 'cash' : 'wallet',
+      fare:
+          (t['fare'] as num).toInt() +
+          ((t['waiting_fee'] as num?)?.toInt() ?? 0),
+      discount: (t['discount'] as num).toInt(),
+      createdAt: parseTime(t['requested_at']) ?? DateTime.now(),
+      km: (t['distance_km'] as num).toDouble(),
+      minutes: (t['duration_min'] as num).round(),
+      driver: driver,
+      tip: (t['my_tip'] as num?)?.toInt() ?? 0,
+      rating: (t['my_rating'] as num?)?.toInt(),
+      feedback: [
+        for (final f in (t['my_tags'] as List?) ?? const []) f as String,
+      ],
+      cancelReason: t['cancel_reason'] as String?,
+    );
+  }
 
   void add(RideRecord r) {
     if (state.any((e) => e.id == r.id)) return;
@@ -126,190 +186,3 @@ final rideHistoryProvider =
     NotifierProvider<RideHistoryController, List<RideRecord>>(
       RideHistoryController.new,
     );
-
-/// Sample Lagos trips so the Activity tab isn't empty in the preview.
-List<RideRecord> _seed() {
-  final now = DateTime.now();
-  Driver d(
-    String name,
-    String car,
-    String color,
-    String plate,
-    double rating,
-  ) => Driver(
-    id: 'seed-$plate',
-    name: name,
-    maskedPhone: '+234 *** *** ${plate.hashCode.abs() % 9000 + 1000}',
-    rating: rating,
-    trips: 3200,
-    years: 3,
-    memberSince: DateTime(now.year - 3, 4),
-    carModel: car,
-    carColor: color,
-    plate: plate,
-  );
-
-  RideRecord r(
-    int n,
-    RideStatus status,
-    String type,
-    String name,
-    String address,
-    LatLng pos,
-    int daysAgo,
-    int hour,
-    int fare,
-    String payment, {
-    int discount = 0,
-    int tip = 0,
-    int? rating,
-    String? cancel,
-    Driver? driver,
-    double km = 8,
-    int minutes = 25,
-  }) {
-    final when = DateTime(
-      now.year,
-      now.month,
-      now.day - daysAgo,
-      hour,
-      10 + n * 4,
-    );
-    return RideRecord(
-      id: 'GRSEED$n',
-      bookingId: 'BKG92608$n',
-      transactionId: 'TRX12212409$n',
-      status: status,
-      rideTypeId: type,
-      pickupName: 'Home',
-      destination: Place(
-        id: 'seed-dest-$n',
-        name: name,
-        address: address,
-        position: pos,
-      ),
-      paymentId: payment,
-      fare: fare,
-      discount: discount,
-      createdAt: when,
-      km: km,
-      minutes: minutes,
-      driver: driver,
-      tip: tip,
-      rating: rating,
-      cancelReason: cancel,
-    );
-  }
-
-  return [
-    r(
-      1,
-      RideStatus.completed,
-      'car',
-      'Ikeja City Mall',
-      'Obafemi Awolowo Way, Ikeja',
-      const LatLng(6.6142, 3.3576),
-      1,
-      9,
-      4350,
-      'wallet',
-      discount: 850,
-      tip: 500,
-      rating: 5,
-      driver: d('Chinedu Okafor', 'Toyota Corolla', 'Silver', 'KJA-482GH', 4.8),
-      km: 11.2,
-      minutes: 38,
-    ),
-    r(
-      2,
-      RideStatus.completed,
-      'bike',
-      'Yaba Tech',
-      'Herbert Macaulay Way, Yaba',
-      const LatLng(6.5175, 3.3725),
-      2,
-      17,
-      1450,
-      'cash',
-      rating: 4,
-      driver: d('Ibrahim Musa', 'Bajaj Boxer', 'Red', 'LSR-219AK', 4.7),
-      km: 5.1,
-      minutes: 16,
-    ),
-    r(
-      3,
-      RideStatus.canceled,
-      'car',
-      'Eko Hotel & Suites',
-      'Adetokunbo Ademola St, VI',
-      const LatLng(6.4262, 3.4290),
-      3,
-      8,
-      5200,
-      'card-4679',
-      cancel: 'Waiting for long time',
-    ),
-    r(
-      4,
-      RideStatus.completed,
-      'comfort',
-      'Murtala Muhammed Airport',
-      'Airport Rd, Ikeja',
-      const LatLng(6.5774, 3.3212),
-      5,
-      6,
-      9800,
-      'card-4679',
-      tip: 1000,
-      rating: 5,
-      driver: d('Tunde Bakare', 'Honda Accord', 'Black', 'LND-731CS', 4.9),
-      km: 22.4,
-      minutes: 55,
-    ),
-    r(
-      5,
-      RideStatus.completed,
-      'keke',
-      'Balogun Market',
-      'Lagos Island',
-      const LatLng(6.4549, 3.3896),
-      7,
-      13,
-      1800,
-      'cash',
-      rating: 4,
-      driver: d('Emeka Nwosu', 'TVS King', 'Yellow', 'EKY-118TK', 4.6),
-      km: 6.3,
-      minutes: 24,
-    ),
-    r(
-      6,
-      RideStatus.canceled,
-      'xl',
-      'Landmark Beach',
-      'Oniru, Victoria Island',
-      const LatLng(6.4227, 3.4472),
-      9,
-      15,
-      7400,
-      'wallet',
-      cancel: 'Change in plans',
-    ),
-    r(
-      7,
-      RideStatus.completed,
-      'car',
-      'University of Lagos',
-      'Akoka, Yaba',
-      const LatLng(6.5158, 3.3896),
-      12,
-      10,
-      3900,
-      'transfer',
-      rating: 5,
-      driver: d('Segun Adeyemi', 'Toyota Camry', 'Grey', 'AAA-905DQ', 4.8),
-      km: 9.6,
-      minutes: 31,
-    ),
-  ];
-}

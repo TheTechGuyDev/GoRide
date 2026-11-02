@@ -128,9 +128,8 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AuthService.message(e))),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(AuthService.message(e))));
       return;
     }
     if (!mounted) return;

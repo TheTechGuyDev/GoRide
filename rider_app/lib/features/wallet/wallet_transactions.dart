@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
+import 'package:goride_core/goride_core.dart';
 
 enum WalletTxType { topUp, ridePayment, tip, refund }
 
@@ -51,36 +51,72 @@ class WalletTx {
 }
 
 class WalletTransactionsController extends Notifier<List<WalletTx>> {
-  @override
-  List<WalletTx> build() => _seed();
+  RealtimeChannel? _channel;
 
+  @override
+  List<WalletTx> build() {
+    final uid = ref.watch(userIdProvider);
+    ref.onDispose(() => _channel?.unsubscribe());
+    if (uid == null) return const [];
+    Future.microtask(refresh);
+    // New rows (trip payments, refunds, top-ups) appear straight away.
+    _channel = Backend.db
+        .channel('wallet-$uid')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'wallet_transactions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: uid,
+          ),
+          callback: (_) => refresh(),
+        )
+        .subscribe();
+    return const [];
+  }
+
+  Future<void> refresh() async {
+    if (Backend.user == null) return;
+    try {
+      final rows = await Backend.db
+          .from('wallet_transactions')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(200);
+      state = [for (final r in rows) _fromRow(r)];
+      ref.invalidate(walletBalanceSyncProvider);
+    } catch (_) {}
+  }
+
+  /// Kept for the preview top-up screens; real money comes from the server.
   void add(WalletTx tx) => state = [tx, ...state];
 
-  List<WalletTx> _seed() {
-    final now = DateTime.now();
-    WalletTx t(int n, int daysAgo, int hour, int amount, String method) =>
-        WalletTx(
-          id: 'TRX12182420$n',
-          type: WalletTxType.topUp,
-          amount: amount,
-          title: 'Top Up',
-          method: method,
-          createdAt: DateTime(
-            now.year,
-            now.month,
-            now.day - daysAgo,
-            hour,
-            12 + n,
-          ),
-          reference: 'PSK_TEST_${8820 + n}',
-        );
-    return [
-      t(1, 2, 20, 10000, 'Mastercard •••• 4679'),
-      t(2, 6, 10, 5000, 'Bank Transfer'),
-      t(3, 11, 18, 2500, 'USSD'),
-    ];
+  static WalletTx _fromRow(Map<String, dynamic> r) {
+    final amount = r['amount'] as int;
+    final type = switch (r['kind'] as String) {
+      'top_up' || 'adjustment' when amount > 0 => WalletTxType.topUp,
+      'refund' => WalletTxType.refund,
+      'tip' => WalletTxType.tip,
+      _ => amount > 0 ? WalletTxType.refund : WalletTxType.ridePayment,
+    };
+    return WalletTx(
+      id:
+          (r['reference'] as String?) ??
+          (r['id'] as String).substring(0, 8).toUpperCase(),
+      type: type,
+      amount: amount.abs(),
+      title: r['title'] as String,
+      method: 'GoRide Wallet',
+      createdAt: parseTime(r['created_at']) ?? DateTime.now(),
+      reference: r['reference'] as String?,
+    );
   }
 }
+
+/// Bumped whenever the transaction list reloads, so the balance reloads too.
+final walletBalanceSyncProvider = Provider<int>((ref) => 0);
 
 final walletTransactionsProvider =
     NotifierProvider<WalletTransactionsController, List<WalletTx>>(

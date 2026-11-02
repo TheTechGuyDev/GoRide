@@ -6,6 +6,7 @@ import '../../core/widgets/common.dart';
 import '../driving/driver_controller.dart';
 import '../../core/router/app_router.dart';
 import '../../core/router/routes.dart';
+import '../../core/notifications/notification_service.dart';
 import '../earnings/earnings_controller.dart';
 import '../registration/registration_controller.dart';
 import '../trip/trip_controller.dart';
@@ -162,7 +163,7 @@ class RequestCard extends StatelessWidget {
           Text(
             commission > 0
                 ? 'You earn ${naira(r.fare - commission)} after ${naira(commission)} commission'
-                : 'You keep the full fare (subscription)',
+                : 'You keep the full fare (no commission)',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 14),
@@ -253,9 +254,22 @@ class RequestOverlay extends ConsumerWidget {
                 secondsLeft: d.secondsLeft,
                 totalSeconds: DriverController.requestSeconds,
                 commission: plan?.commissionOn(req.fare) ?? 0,
-                onAccept: () {
-                  final accepted = ref.read(driverProvider.notifier).accept();
-                  if (accepted == null) return;
+                onAccept: () async {
+                  final (accepted, error) = await ref
+                      .read(driverProvider.notifier)
+                      .accept();
+                  if (accepted == null) {
+                    if (error != null) {
+                      ref
+                          .read(notificationsProvider.notifier)
+                          .notify(
+                            NotifyCategory.requests,
+                            'Request no longer available',
+                            error,
+                          );
+                    }
+                    return;
+                  }
                   ref.read(tripProvider.notifier).start(accepted);
                   appRouter.push(Routes.trip);
                 },

@@ -148,9 +148,9 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
                     .signInWithGoogle();
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AuthService.message(e))),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(AuthService.message(e))));
               }
             },
           ),

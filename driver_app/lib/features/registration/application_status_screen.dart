@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:goride_core/goride_core.dart';
 
-import '../../core/notifications/notification_service.dart';
 import '../../core/router/routes.dart';
 import 'registration_controller.dart';
 
@@ -164,64 +163,13 @@ class ApplicationStatusScreen extends ConsumerWidget {
                 color: AppColors.fieldFill,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Preview controls',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'In the live app, an admin approves or rejects from the dashboard. Try either outcome here.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            ref
-                                .read(registrationProvider.notifier)
-                                .simulateApproval();
-                            ref
-                                .read(notificationsProvider.notifier)
-                                .notify(
-                                  NotifyCategory.documents,
-                                  'You\'re approved to drive',
-                                  'Welcome to GoRide! Go online to get your first trip.',
-                                  route: Routes.home,
-                                );
-                          },
-                          child: const Text('Approve'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            ref
-                                .read(registrationProvider.notifier)
-                                .simulateRejection();
-                            ref
-                                .read(notificationsProvider.notifier)
-                                .notify(
-                                  NotifyCategory.documents,
-                                  'A document needs attention',
-                                  'Your road worthiness certificate was not clear. Please upload it again.',
-                                  route: Routes.regStatus,
-                                );
-                          },
-                          child: const Text('Reject a doc'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              child: Text(
+                'Our team reviews applications within 24 hours. You will get a notification as soon as you are approved, and this screen updates by itself.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
               ),
             ),
           ],

@@ -79,7 +79,7 @@ class _TripScreenState extends ConsumerState<TripScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _PinSheet(expected: t.request.pin),
+      builder: (_) => const _PinSheet(),
     );
     if (ok == true && mounted) {
       setState(() => _follow = true);
@@ -499,7 +499,7 @@ class _TripPanel extends StatelessWidget {
                           color: AppColors.textSecondary,
                         ),
                         Text(
-                          ' ${naira(t.totalFare)} ${r.payment.label.toLowerCase()}',
+                          ' ${naira(t.totalFare)} · ${r.payment.label}',
                           style: TextStyle(color: AppColors.textSecondary),
                         ),
                       ],
@@ -752,8 +752,7 @@ class _SlideToEndState extends State<_SlideToEnd> {
 
 /// Rider reads out their 4-digit PIN; trip starts only if it matches.
 class _PinSheet extends ConsumerStatefulWidget {
-  const _PinSheet({required this.expected});
-  final String expected;
+  const _PinSheet();
 
   @override
   ConsumerState<_PinSheet> createState() => _PinSheetState();
@@ -763,15 +762,21 @@ class _PinSheetState extends ConsumerState<_PinSheet> {
   final _ctrl = TextEditingController();
   String? _error;
 
-  void _submit() {
-    final ok = ref.read(tripProvider.notifier).startTrip(_ctrl.text);
-    if (ok) {
+  bool _checking = false;
+
+  Future<void> _submit() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    final error = await ref.read(tripProvider.notifier).startTrip(_ctrl.text);
+    if (!mounted) return;
+    setState(() => _checking = false);
+    if (error == null) {
       HapticFeedback.mediumImpact();
       Navigator.pop(context, true);
     } else {
       HapticFeedback.heavyImpact();
       setState(() {
-        _error = 'Wrong PIN. Ask the rider to check their app.';
+        _error = error;
         _ctrl.clear();
       });
     }
@@ -833,11 +838,15 @@ class _PinSheetState extends ConsumerState<_PinSheet> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Preview: the rider\'s PIN is ${widget.expected}',
+            'The rider sees their PIN in the GoRide app.',
             style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),
           const SizedBox(height: 16),
-          AppButton(label: 'Start trip', onPressed: _submit),
+          AppButton(
+            label: 'Start trip',
+            loading: _checking,
+            onPressed: _submit,
+          ),
         ],
       ),
     );

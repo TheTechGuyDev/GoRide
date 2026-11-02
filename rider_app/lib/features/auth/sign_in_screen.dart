@@ -118,9 +118,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     .signInWithGoogle();
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AuthService.message(e))),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(AuthService.message(e))));
               }
             },
           ),

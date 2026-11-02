@@ -4,6 +4,7 @@ import 'package:goride_core/goride_core.dart';
 import '../../core/router/routes.dart';
 import '../earnings/earnings_controller.dart';
 import '../registration/registration_controller.dart';
+import '../trip/trip_controller.dart';
 
 /// Whether the code screen was reached from sign up or sign in.
 enum AuthFlow { signUp, signIn }
@@ -72,15 +73,18 @@ class AuthController extends Notifier<AuthState> {
     final contact = (p['phone'] as String?) ?? user.email ?? '';
     state = state.copyWith(email: user.email, isSignedIn: true);
 
-    // Trips, earnings and registration still run on preview data until the
-    // driver app is connected in the next step.
-    if (d['status'] == 'approved') {
-      ref.read(registrationProvider.notifier).loadDemoDriver(contact);
-      ref.read(earningsProvider.notifier).seedDemo();
-      return Routes.home;
+    final reg = ref.read(registrationProvider.notifier);
+    reg.startFresh(contact);
+    await reg.load();
+    await ref.read(earningsProvider.notifier).load();
+    final status = d['status'];
+    if (status == 'approved') {
+      final onTrip = await ref.read(tripProvider.notifier).resume();
+      return onTrip ? Routes.trip : Routes.home;
     }
-    ref.read(registrationProvider.notifier).startFresh(contact);
-    ref.read(earningsProvider.notifier).reset();
+    if (status == 'pending' || status == 'rejected' || status == 'suspended') {
+      return Routes.regStatus;
+    }
     return Routes.registration;
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart' show Backend, userIdProvider;
 
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_button.dart';
@@ -20,25 +21,65 @@ class EmergencyContact {
   final String email;
 }
 
-/// Next of kin who get alerted in an emergency.
-/// Later: `emergency_contacts` table in Supabase.
+/// Next of kin who get alerted in an emergency (`emergency_contacts`).
 class EmergencyContactsController extends Notifier<List<EmergencyContact>> {
   static const maxContacts = 3;
 
   @override
-  List<EmergencyContact> build() => const [];
+  List<EmergencyContact> build() {
+    final uid = ref.watch(userIdProvider);
+    if (uid == null) return const [];
+    Future.microtask(_load);
+    return const [];
+  }
 
-  void save(EmergencyContact c) {
+  Future<void> _load() async {
+    try {
+      final rows = await Backend.db
+          .from('emergency_contacts')
+          .select()
+          .order('created_at');
+      state = [
+        for (final r in rows)
+          EmergencyContact(
+            id: r['id'] as String,
+            name: r['name'] as String,
+            relationship: (r['relation'] as String?) ?? '',
+            phone: r['phone'] as String,
+            email: (r['email'] as String?) ?? '',
+          ),
+      ];
+    } catch (_) {}
+  }
+
+  Future<void> save(EmergencyContact c) async {
     final i = state.indexWhere((e) => e.id == c.id);
-    if (i == -1) {
-      if (state.length >= maxContacts) return;
-      state = [...state, c];
-    } else {
-      state = [...state]..[i] = c;
+    if (i == -1 && state.length >= maxContacts) return;
+    state = i == -1 ? [...state, c] : ([...state]..[i] = c);
+    final row = {
+      'user_id': Backend.user!.id,
+      'name': c.name,
+      'relation': c.relationship,
+      'phone': c.phone,
+      'email': c.email,
+    };
+    try {
+      if (i == -1 || c.id.length != 36) {
+        await Backend.db.from('emergency_contacts').insert(row);
+      } else {
+        await Backend.db.from('emergency_contacts').update(row).eq('id', c.id);
+      }
+    } finally {
+      await _load();
     }
   }
 
-  void remove(String id) => state = state.where((e) => e.id != id).toList();
+  Future<void> remove(String id) async {
+    state = state.where((e) => e.id != id).toList();
+    if (id.length == 36) {
+      await Backend.db.from('emergency_contacts').delete().eq('id', id);
+    }
+  }
 }
 
 final emergencyContactsProvider =

@@ -216,9 +216,9 @@ class SocialButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed:
             onPressed ??
-            () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Coming soon')),
-            ),
+            () =>
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(content: Text('Coming soon'))),
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: AppColors.border),
           shape: const StadiumBorder(),

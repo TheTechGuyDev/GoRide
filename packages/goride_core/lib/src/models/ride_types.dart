@@ -78,7 +78,8 @@ class FareBreakdown {
   final int total;
 }
 
-const rideTypes = [
+/// Replaced with the live prices from the database on start ([loadRideTypes]).
+List<RideType> rideTypes = const [
   RideType(
     id: 'bike',
     name: 'GoRide Bike',

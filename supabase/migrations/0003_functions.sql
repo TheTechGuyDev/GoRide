@@ -187,7 +187,8 @@ begin
   end if;
   update trips set driver_id = d.id, status = 'accepted', accepted_at = now()
     where id = p_trip and status = 'requested' and driver_id is null
-      and ride_type_id = d.ride_type_id
+      and (ride_type_id = d.ride_type_id
+        or (ride_type_id = 'car' and d.ride_type_id in ('comfort', 'xl')))
     returning * into t;
   if t.id is null then raise exception 'This request is no longer available'; end if;
   update driver_locations set on_trip = true where driver_id = d.id;

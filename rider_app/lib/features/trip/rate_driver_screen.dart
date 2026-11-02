@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:goride_core/goride_core.dart' show AuthService, Backend;
 
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
@@ -51,6 +52,16 @@ class _RateDriverScreenState extends ConsumerState<RateDriverScreen> {
           trip.id,
           (r) => r.copyWith(rating: _stars, feedback: _selected.toList()),
         );
+    Backend.db
+        .rpc(
+          'rate_trip',
+          params: {
+            'p_trip': trip.id,
+            'p_stars': _stars,
+            'p_tags': _selected.toList(),
+          },
+        )
+        .then((_) {}, onError: (_) {});
     if (_stars >= 4) {
       context.go(Routes.tipDriver);
     } else {
@@ -237,7 +248,7 @@ class _TipDriverScreenState extends ConsumerState<TipDriverScreen> {
       ? int.tryParse(_custom.text.replaceAll(RegExp(r'\D'), '')) ?? 0
       : (_amount ?? 0);
 
-  void _pay() {
+  Future<void> _pay() async {
     final tip = _tip;
     if (tip <= 0) return;
     if (tip > 50000) {
@@ -253,15 +264,24 @@ class _TipDriverScreenState extends ConsumerState<TipDriverScreen> {
       return;
     }
     final trip = ref.read(tripControllerProvider);
+    if (trip == null) return;
+    setState(() => _error = null);
+    try {
+      await Backend.db.rpc(
+        'tip_trip',
+        params: {'p_trip': trip.id, 'p_tip': tip},
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = AuthService.message(e));
+      return;
+    }
     ref
         .read(walletBalanceProvider.notifier)
         .debit(tip, type: WalletTxType.tip, title: 'Driver tip');
-    if (trip != null) {
-      ref
-          .read(rideHistoryProvider.notifier)
-          .update(trip.id, (r) => r.copyWith(tip: tip));
-    }
-    context.go(Routes.feedbackThanks, extra: tip);
+    ref
+        .read(rideHistoryProvider.notifier)
+        .update(trip.id, (r) => r.copyWith(tip: tip));
+    if (mounted) context.go(Routes.feedbackThanks, extra: tip);
   }
 
   @override

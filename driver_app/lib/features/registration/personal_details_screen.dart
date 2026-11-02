@@ -8,15 +8,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'registration_controller.dart';
 
-const driverCities = [
-  'Lagos',
-  'Abuja',
-  'Port Harcourt',
-  'Ibadan',
-  'Benin City',
-  'Enugu',
-  'Kano',
-];
+const driverCities = ['Ibadan', 'Ilorin', 'Abeokuta', 'Lagos', 'Abuja'];
 
 /// Used during registration and later as "Edit profile".
 class PersonalDetailsScreen extends ConsumerStatefulWidget {
@@ -92,9 +84,16 @@ class _PersonalDetailsScreenState extends ConsumerState<PersonalDetailsScreen> {
       );
       return;
     }
+    if (!PhoneUtils.isValid(_phone.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid Nigerian phone number')),
+      );
+      return;
+    }
     ref
         .read(registrationProvider.notifier)
         .savePersonal(
+          phone: PhoneUtils.toE164(_phone.text),
           PersonalDetails(
             fullName: _name.text.trim(),
             email: _email.text.trim(),
@@ -215,7 +214,10 @@ class _PersonalDetailsScreenState extends ConsumerState<PersonalDetailsScreen> {
             ),
             const SizedBox(height: 20),
             const FieldLabel('Phone number'),
-            PhoneField(controller: _phone, readOnly: true),
+            PhoneField(
+              controller: _phone,
+              readOnly: ref.read(registrationProvider).phone.startsWith('+'),
+            ),
             const SizedBox(height: 20),
             const FieldLabel('City you\'ll drive in'),
             DropdownButtonFormField<String>(

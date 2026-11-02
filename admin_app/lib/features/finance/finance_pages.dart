@@ -297,10 +297,10 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
       children: [
         PageHeader(
           title: 'Payouts',
-          subtitle: 'Drivers cash out instantly with Paystack Transfers. Pending and failed ones need you.',
+          subtitle: 'Drivers request payouts from the app. Send the money from your bank or Paystack, then mark it paid.',
           actions: [
             PrimaryButton(
-              label: 'Pay all pending (${pending.length})',
+              label: 'Mark all paid (${pending.length})',
               icon: Icons.send,
               busy: _paying,
               onPressed: pending.isEmpty
@@ -309,17 +309,18 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                       final total = pending.fold(0, (a, p) => a + p.amount);
                       final ok = await confirm(
                         context,
-                        title: 'Send ${pending.length} payouts?',
+                        title: 'Mark ${pending.length} payouts as paid?',
                         body:
-                            '${naira(total)} will be sent to drivers\' bank accounts.',
-                        ok: 'Send',
+                            'Only do this after you have sent ${naira(total)} to the drivers\' bank accounts.',
+                        ok: 'Mark paid',
                       );
                       if (!ok) return;
                       setState(() => _paying = true);
                       final n = await store.payAllPending();
                       if (!mounted) return;
                       setState(() => _paying = false);
-                      if (context.mounted) toast(context, '$n payouts sent');
+                      if (context.mounted)
+                        toast(context, '$n payouts marked paid');
                     },
             ),
           ],
@@ -394,7 +395,7 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                     p.failReason ?? (p.reference.isEmpty ? null : p.reference),
                   ),
                   Pill(p.status.label, color: p.status.color),
-                  p.status == PayoutStatus.completed
+                  p.status != PayoutStatus.pending
                       ? const SizedBox.shrink()
                       : TextButton(
                           onPressed: _retrying.contains(p.id)
@@ -407,15 +408,13 @@ class _PayoutsPageState extends ConsumerState<PayoutsPage> {
                                   if (context.mounted)
                                     toast(
                                       context,
-                                      '${naira(p.amount)} sent to ${p.driverName}',
+                                      '${naira(p.amount)} to ${p.driverName} marked paid',
                                     );
                                 },
                           child: Text(
                             _retrying.contains(p.id)
-                                ? 'Sending...'
-                                : (p.status == PayoutStatus.failed
-                                      ? 'Retry'
-                                      : 'Pay now'),
+                                ? 'Saving...'
+                                : 'Mark paid',
                             style: const TextStyle(
                               color: AC.primary,
                               fontWeight: FontWeight.w700,

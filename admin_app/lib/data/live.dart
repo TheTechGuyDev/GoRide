@@ -63,109 +63,105 @@ class LiveState {
   final List<(String name, LatLng pos, String type)> idle;
 }
 
-/// Simulated live trips. Later: Supabase Realtime on `trip_locations` and
-/// `driver_locations`.
+/// Live map from Supabase: online drivers (`driver_locations`) and trips in
+/// progress, refreshed every few seconds.
 class LiveController extends Notifier<LiveState> {
-  final _r = Random(7);
   Timer? _timer;
-  int _seq = 0;
 
   @override
   LiveState build() {
     ref.onDispose(() => _timer?.cancel());
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
-    final data = ref.read(storeProvider);
-    final online = data.drivers.where((d) => d.online).toList();
-    final trips = <LiveTrip>[];
-    for (var i = 0; i < min(9, online.length); i++) {
-      trips.add(
-        _newTrip(online[i], progress: _r.nextDouble() * 0.8, offRoute: i == 0),
-      );
-    }
-    final idle = [
-      for (final d in online.skip(9))
-        (
-          d.name,
-          offsetPoint(
-            lagosPlaces[_r.nextInt(lagosPlaces.length)].position,
-            200 + _r.nextDouble() * 1500,
-            _r.nextDouble() * 360,
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _load());
+    Future.microtask(_load);
+    return const LiveState(trips: [], idle: []);
+  }
+
+  Future<void> _load() async {
+    if (ref.read(sessionProvider) == null) return;
+    try {
+      final results = await Future.wait(<Future<dynamic>>[
+        Backend.db
+            .from('driver_locations')
+            .select('driver_id, lat, lng, ride_type_id, on_trip, updated_at')
+            .eq('online', true),
+        Backend.db.from('trips').select(tripColumns).inFilter('status', [
+          'accepted',
+          'arrived',
+          'on_trip',
+        ]),
+      ]);
+      final data = ref.read(storeProvider);
+      final locs = {
+        for (final r in results[0] as List)
+          if (r['lat'] != null)
+            r['driver_id'] as String: LatLng(
+              (r['lat'] as num).toDouble(),
+              (r['lng'] as num).toDouble(),
+            ),
+      };
+      final types = {
+        for (final r in results[0] as List)
+          r['driver_id'] as String: (r['ride_type_id'] as String?) ?? 'car',
+      };
+      final busy = <String>{};
+      final trips = <LiveTrip>[];
+      for (final t in results[1] as List) {
+        final driverId = t['driver_id'] as String?;
+        if (driverId == null) continue;
+        busy.add(driverId);
+        final from = Place(
+          id: 'from',
+          name: t['pickup_address'] as String,
+          address: t['pickup_address'] as String,
+          position: LatLng(
+            (t['pickup_lat'] as num).toDouble(),
+            (t['pickup_lng'] as num).toDouble(),
           ),
-          d.rideTypeId,
-        ),
-    ];
-    return LiveState(trips: trips, idle: idle);
-  }
-
-  LiveTrip _newTrip(Driver d, {double progress = 0, bool offRoute = false}) {
-    final from = lagosPlaces[_r.nextInt(lagosPlaces.length)];
-    var to = lagosPlaces[_r.nextInt(lagosPlaces.length)];
-    if (to == from)
-      to = lagosPlaces[(lagosPlaces.indexOf(from) + 5) % lagosPlaces.length];
-    // A gently curved path between the two places.
-    final mid = LatLng(
-      (from.position.latitude + to.position.latitude) / 2 +
-          (_r.nextDouble() - 0.5) * 0.02,
-      (from.position.longitude + to.position.longitude) / 2 +
-          (_r.nextDouble() - 0.5) * 0.02,
-    );
-    final path = <LatLng>[];
-    for (var i = 0; i <= 24; i++) {
-      final t = i / 24;
-      final a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
-      path.add(
-        LatLng(
-          a * from.position.latitude +
-              b * mid.latitude +
-              c * to.position.latitude,
-          a * from.position.longitude +
-              b * mid.longitude +
-              c * to.position.longitude,
-        ),
+        );
+        final to = Place(
+          id: 'to',
+          name: t['dropoff_address'] as String,
+          address: t['dropoff_address'] as String,
+          position: LatLng(
+            (t['dropoff_lat'] as num).toDouble(),
+            (t['dropoff_lng'] as num).toDouble(),
+          ),
+        );
+        final car = locs[driverId] ?? from.position;
+        final target = t['status'] == 'on_trip' ? to.position : from.position;
+        final driver = data.driver(driverId);
+        final rider = data.rider(t['rider_id'] as String);
+        trips.add(
+          LiveTrip(
+            id: t['code'] as String,
+            driverName: driver?.name ?? 'Driver',
+            riderName: rider?.name ?? 'Rider',
+            plate: driver?.plate ?? '',
+            rideTypeId: t['ride_type_id'] as String,
+            from: from,
+            to: to,
+            path: [car, target],
+            progress: 0,
+            fare: (t['fare'] as num).toInt(),
+            offRoute: data.safety.any(
+              (e) => e.tripId == t['code'] && e.status != SafetyStatus.resolved,
+            ),
+          ),
+        );
+      }
+      state = LiveState(
+        trips: trips,
+        idle: [
+          for (final e in locs.entries)
+            if (!busy.contains(e.key))
+              (
+                data.driver(e.key)?.name ?? 'Driver',
+                e.value,
+                types[e.key] ?? 'car',
+              ),
+        ],
       );
-    }
-    final km = pathLength(path) / 1000;
-    return LiveTrip(
-      id: 'TRP-L${++_seq}',
-      driverName: d.name,
-      riderName: [
-        'Adaeze O.',
-        'Bola A.',
-        'Chinedu E.',
-        'Kemi A.',
-        'Segun W.',
-        'Zainab B.',
-        'Tolu B.',
-        'Grace N.',
-      ][_r.nextInt(8)],
-      plate: d.plate,
-      rideTypeId: d.rideTypeId,
-      from: from,
-      to: to,
-      path: path,
-      progress: progress,
-      fare: roundFare(700 + km * 260),
-      offRoute: offRoute,
-    );
-  }
-
-  void _tick() {
-    final data = ref.read(storeProvider);
-    final online = data.drivers.where((d) => d.online).toList();
-    state = LiveState(
-      idle: state.idle,
-      trips: [
-        for (final t in state.trips)
-          t.progress >= 1
-              ? _newTrip(online[_r.nextInt(online.length)])
-              : t.copyWith(
-                  progress: min(
-                    1.0,
-                    t.progress + 0.004 + _r.nextDouble() * 0.004,
-                  ),
-                ),
-      ],
-    );
+    } catch (_) {}
   }
 }
 

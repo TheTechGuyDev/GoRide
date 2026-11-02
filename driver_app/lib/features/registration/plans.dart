@@ -75,8 +75,7 @@ class DriverPlan {
       isSubscription && paidUntil != null && paidUntil!.isAfter(DateTime.now());
 
   /// GoRide's share of a fare under this plan.
-  int commissionOn(int fare) =>
-      isSubscription || foundingFree
+  int commissionOn(int fare) => isSubscription || foundingFree
       ? 0
       : (fare * PlanPricing.commissionRate).round();
 

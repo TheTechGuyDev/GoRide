@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'session.dart';
+
 /// The one Supabase project shared by the rider app, driver app and admin.
 /// The publishable key is safe to ship in apps; security comes from the
 /// row level security rules in supabase/migrations.
@@ -8,7 +10,8 @@ class Backend {
   Backend._();
 
   static const url = 'https://xucckoofhmbyrnvvbxii.supabase.co';
-  static const publishableKey = 'sb_publishable_OZHdPcTqdJNxvp-6XsKmiw_EWCd1a07';
+  static const publishableKey =
+      'sb_publishable_OZHdPcTqdJNxvp-6XsKmiw_EWCd1a07';
 
   static bool _ready = false;
   static bool get ready => _ready;
@@ -17,6 +20,7 @@ class Backend {
     if (_ready) return;
     await Supabase.initialize(url: url, publishableKey: publishableKey);
     _ready = true;
+    await loadRideTypes();
   }
 
   static SupabaseClient get db => Supabase.instance.client;
@@ -31,6 +35,15 @@ class Backend {
     return '$mobileScheme://login-callback';
   }
 }
+
+/// Every `trips` column apps may read (the PIN is private to the rider).
+const tripColumns =
+    'id, code, rider_id, driver_id, ride_type_id, status, pickup_address, '
+    'pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, stops, '
+    'distance_km, duration_min, surge, fare, discount, promo_code, waiting_fee, '
+    'total_fare, commission, driver_earning, payment, scheduled_for, '
+    'requested_at, accepted_at, arrived_at, started_at, completed_at, '
+    'cancelled_at, cancelled_by, cancel_reason, refunded';
 
 /// Email-code and Google sign-in, shared by both apps.
 class AuthService {
@@ -54,7 +67,8 @@ class AuthService {
       type: OtpType.email,
     );
     final user = res.user;
-    if (user == null) throw const AuthException('That code did not work. Try again.');
+    if (user == null)
+      throw const AuthException('That code did not work. Try again.');
     return user;
   }
 
@@ -85,10 +99,13 @@ class AuthService {
     if (m.contains('rate limit') || m.contains('only request this after')) {
       return 'Please wait a minute before asking for another code.';
     }
-    if (m.contains('profiles_phone_key') || m.contains('duplicate key') && m.contains('phone')) {
+    if (m.contains('profiles_phone_key') ||
+        m.contains('duplicate key') && m.contains('phone')) {
       return 'This phone number is already linked to another account.';
     }
-    if (m.contains('failed host lookup') || m.contains('socketexception') || m.contains('failed to fetch')) {
+    if (m.contains('failed host lookup') ||
+        m.contains('socketexception') ||
+        m.contains('failed to fetch')) {
       return 'No internet connection. Check your network and try again.';
     }
     return raw;

@@ -48,6 +48,15 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     }
 
     if (_type == PlanType.commission) {
+      try {
+        await Backend.db.rpc('switch_to_commission');
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(AuthService.message(e))));
+        return;
+      }
+      if (!mounted) return;
       reg.savePlan(
         DriverPlan(commissionFreeUntil: current.commissionFreeUntil),
       );
@@ -60,11 +69,10 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
 
     // Subscription: pay from wallet.
     setState(() => _busy = true);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    final paid = ref
+    final paid = await ref
         .read(earningsProvider.notifier)
         .paySubscription(_price, _period);
+    if (!mounted) return;
     setState(() => _busy = false);
     if (!paid) {
       final go = await showDialog<bool>(

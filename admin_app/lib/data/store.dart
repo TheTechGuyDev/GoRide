@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:goride_core/goride_core.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'models.dart';
+import 'remote.dart';
 
 /// Everything the dashboard shows. Mock data now; once Supabase is added
 /// each list is a table (drivers, riders, trips, payouts, sos_events,
@@ -116,22 +118,193 @@ class AdminData {
   }
 }
 
-/// The signed-in staff member (preview: pick a role on the login screen).
+/// The signed-in staff member. Staff sign in with an email code; access
+/// comes from the `staff` table (or an invite in `staff_invites`).
 class SessionController extends Notifier<StaffMember?> {
   @override
-  StaffMember? build() => null;
+  StaffMember? build() {
+    Future.microtask(restore);
+    return null;
+  }
+
+  /// Re-opens the dashboard if a staff session is saved in the browser.
+  Future<void> restore() async {
+    if (Backend.user == null) return;
+    try {
+      await _claim();
+    } catch (_) {}
+  }
+
+  /// After the email code is verified. Returns an error if not staff.
+  Future<String?> enter() async {
+    try {
+      final me = await _claim();
+      if (me == null) {
+        await AuthService.signOut();
+        return 'This email is not on the GoRide staff list. Ask a Super Admin to invite you.';
+      }
+      if (!me.active) {
+        await AuthService.signOut();
+        state = null;
+        return 'Your staff access has been removed.';
+      }
+      return null;
+    } catch (e) {
+      return AuthService.message(e);
+    }
+  }
+
+  Future<StaffMember?> _claim() async {
+    final row = await Backend.db.rpc('claim_staff');
+    if (row == null || (row as Map)['id'] == null) return null;
+    final me = StaffMember(
+      id: row['id'] as String,
+      name: (row['full_name'] as String?) ?? row['email'] as String,
+      email: row['email'] as String,
+      role: roleFromDb(row['role'] as String),
+      active: row['active'] == true,
+      lastActive: DateTime.now(),
+    );
+    if (me.active) state = me;
+    return me;
+  }
 
   void signIn(StaffMember m) => state = m;
-  void signOut() => state = null;
+
+  Future<void> signOut() async {
+    state = null;
+    await AuthService.signOut();
+  }
 }
 
 final sessionProvider = NotifierProvider<SessionController, StaffMember?>(
   SessionController.new,
 );
 
-class AdminStore extends Notifier<AdminData> {
+/// Last server error, shown as a message by the dashboard shell.
+class StoreErrorController extends Notifier<String?> {
   @override
-  AdminData build() => _seed();
+  String? build() => null;
+  void set(String? e) => state = e;
+}
+
+final storeErrorProvider = NotifierProvider<StoreErrorController, String?>(
+  StoreErrorController.new,
+);
+
+class AdminStore extends Notifier<AdminData> {
+  final _tripIds = <String, String>{};
+  final _docTypes = <String, List<String>>{};
+  RealtimeChannel? _channel;
+  Timer? _debounce;
+  Timer? _refresh;
+  int onlineDrivers = 0;
+
+  /// Real data from Supabase once a staff member is signed in.
+  @override
+  AdminData build() {
+    final me = ref.watch(sessionProvider);
+    ref.onDispose(() {
+      _channel?.unsubscribe();
+      _debounce?.cancel();
+      _refresh?.cancel();
+    });
+    final seed = _seed();
+    final empty = AdminData(
+      drivers: const [],
+      riders: const [],
+      trips: const [],
+      payouts: const [],
+      subscriptions: const [],
+      safety: const [],
+      tickets: const [],
+      promos: const [],
+      broadcasts: const [],
+      staff: const [],
+      audit: const [],
+      pricing: const [],
+      planPrices: const [],
+      channels: seed.channels,
+      settings: seed.settings,
+    );
+    if (me == null) return empty;
+    Future.microtask(load);
+    // New trips, SOS alerts, applications and tickets appear by themselves.
+    _channel = Backend.db.channel('admin-live');
+    for (final table in [
+      'trips',
+      'safety_events',
+      'drivers',
+      'payouts',
+      'support_tickets',
+      'ticket_messages',
+    ]) {
+      _channel!.onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: table,
+        callback: (_) => _soon(),
+      );
+    }
+    _channel!.subscribe();
+    _refresh = Timer.periodic(const Duration(seconds: 30), (_) => load());
+    return empty;
+  }
+
+  void _soon() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 800), load);
+  }
+
+  Future<void> load() async {
+    if (ref.read(sessionProvider) == null) return;
+    try {
+      final j = await Backend.db.rpc('admin_snapshot');
+      final snap = parseSnapshot(Map<String, dynamic>.from(j as Map), state);
+      _tripIds
+        ..clear()
+        ..addAll(snap.tripIds);
+      _docTypes
+        ..clear()
+        ..addAll(snap.docTypes);
+      onlineDrivers = snap.onlineCount;
+      state = snap.data;
+    } catch (e) {
+      ref.read(storeErrorProvider.notifier).set(AuthService.message(e));
+    }
+  }
+
+  /// Runs a server change, then reloads so every page shows the truth.
+  Future<void> _server(Future<dynamic> Function() call, {String? audit}) async {
+    try {
+      await call();
+      if (audit != null) {
+        await Backend.db.from('audit_log').insert({
+          'staff_id': Backend.user!.id,
+          'action': audit,
+        });
+      }
+    } catch (e) {
+      ref.read(storeErrorProvider.notifier).set(AuthService.message(e));
+    }
+    await load();
+  }
+
+  /// Short-lived link to a driver's uploaded document photo.
+  Future<String?> docPhotoUrl(String driverId, int index) async {
+    final type = _docTypes[driverId]?.elementAtOrNull(index);
+    if (type == null) return null;
+    try {
+      return await Backend.db.storage
+          .from('driver-docs')
+          .createSignedUrl('$driverId/$type.jpg', 600);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _rpc(String fn, Map<String, dynamic> params) =>
+      _server(() => Backend.db.rpc(fn, params: params));
 
   String get _me => ref.read(sessionProvider)?.name ?? 'System';
 
@@ -164,6 +337,19 @@ class AdminStore extends Notifier<AdminData> {
       '${s == DocState.approved ? 'Approved' : 'Rejected'} ${d.docs[index].title} for ${d.name}${note == null ? '' : ': $note'}',
       category: 'Drivers',
     );
+    final type = _docTypes[driverId]?.elementAtOrNull(index);
+    if (type != null) {
+      _rpc('admin_review_doc', {
+        'p_driver': driverId,
+        'p_type': type,
+        'p_status': s == DocState.approved
+            ? 'approved'
+            : s == DocState.rejected
+            ? 'rejected'
+            : 'pending',
+        'p_note': note,
+      });
+    }
   }
 
   void approveDriver(String id) {
@@ -178,6 +364,7 @@ class AdminStore extends Notifier<AdminData> {
       ),
     );
     _log('Approved driver ${d.name} (${d.plate})', category: 'Drivers');
+    _rpc('approve_driver', {'p_driver': id});
   }
 
   void rejectDriver(String id, String reason) {
@@ -188,6 +375,7 @@ class AdminStore extends Notifier<AdminData> {
       (d) => d.copyWith(status: DriverStatus.rejected, suspendReason: reason),
     );
     _log('Rejected application from ${d.name}: $reason', category: 'Drivers');
+    _rpc('reject_driver', {'p_driver': id, 'p_note': reason});
   }
 
   void suspendDriver(String id, String reason) {
@@ -202,6 +390,11 @@ class AdminStore extends Notifier<AdminData> {
       ),
     );
     _log('Suspended driver ${d.name}: $reason', category: 'Drivers');
+    _rpc('admin_set_driver_status', {
+      'p_driver': id,
+      'p_status': 'suspended',
+      'p_note': reason,
+    });
   }
 
   void reactivateDriver(String id) {
@@ -212,6 +405,7 @@ class AdminStore extends Notifier<AdminData> {
       (d) => d.copyWith(status: DriverStatus.active, clearSuspend: true),
     );
     _log('Reactivated driver ${d.name}', category: 'Drivers');
+    _rpc('admin_set_driver_status', {'p_driver': id, 'p_status': 'approved'});
   }
 
   // ---- Riders ----
@@ -229,6 +423,7 @@ class AdminStore extends Notifier<AdminData> {
       '${blocked ? 'Blocked' : 'Unblocked'} rider ${r.name}',
       category: 'Riders',
     );
+    _rpc('admin_set_blocked', {'p_user': id, 'p_blocked': blocked});
   }
 
   void creditRider(String id, int amount, String reason) {
@@ -241,6 +436,11 @@ class AdminStore extends Notifier<AdminData> {
       ],
     );
     _log('Credited ${naira(amount)} to ${r.name}: $reason', category: 'Riders');
+    _rpc('adjust_wallet', {
+      'p_user': id,
+      'p_amount': amount,
+      'p_title': reason,
+    });
   }
 
   // ---- Trips ----
@@ -262,55 +462,43 @@ class AdminStore extends Notifier<AdminData> {
       'Refunded ${naira(amount)} on trip $tripId to ${trip.riderName}: $reason',
       category: 'Trips',
     );
+    final uuid = _tripIds[tripId];
+    if (uuid != null) {
+      _rpc('refund_trip', {
+        'p_trip': uuid,
+        'p_amount': amount,
+        'p_reason': reason,
+      });
+    }
   }
 
   // ---- Payouts ----
 
+  /// Finance has sent the money (bank app or Paystack); mark it paid.
   Future<void> retryPayout(String id) async {
-    await Future.delayed(const Duration(milliseconds: 900));
-    final p = state.payouts.where((x) => x.id == id).firstOrNull;
-    if (p == null) return;
-    state = state.copyWith(
-      payouts: [
-        for (final x in state.payouts)
-          x.id == id
-              ? x.copyWith(
-                  status: PayoutStatus.completed,
-                  reference:
-                      'TRF_${DateTime.now().millisecondsSinceEpoch % 100000000}',
-                )
-              : x,
-      ],
-    );
-    _log(
-      'Sent payout ${naira(p.amount)} to ${p.driverName}',
-      category: 'Payouts',
-    );
+    await _rpc('set_payout_status', {'p_payout': id, 'p_status': 'paid'});
   }
 
   Future<int> payAllPending() async {
     final pending = state.payouts
         .where((p) => p.status == PayoutStatus.pending)
         .toList();
-    await Future.delayed(const Duration(milliseconds: 1200));
-    state = state.copyWith(
-      payouts: [
-        for (final x in state.payouts)
-          x.status == PayoutStatus.pending
-              ? x.copyWith(
-                  status: PayoutStatus.completed,
-                  reference: 'TRF_${x.id.hashCode.abs() % 100000000}',
-                )
-              : x,
-      ],
-    );
-    final total = pending.fold(0, (a, p) => a + p.amount);
-    _log(
-      'Sent ${pending.length} pending payouts (${naira(total)})',
-      category: 'Payouts',
-    );
+    for (final p in pending) {
+      try {
+        await Backend.db.rpc(
+          'set_payout_status',
+          params: {'p_payout': p.id, 'p_status': 'paid'},
+        );
+      } catch (_) {}
+    }
+    await load();
     return pending.length;
   }
+
+  Future<void> failPayout(String id, String reason) => _rpc(
+    'set_payout_status',
+    {'p_payout': id, 'p_status': 'failed', 'p_reason': reason},
+  );
 
   // ---- Safety ----
 
@@ -336,6 +524,15 @@ class AdminStore extends Notifier<AdminData> {
       '${status.label} ${e.kind.label} alert on trip ${e.tripId}${hasNote ? ': ${note.trim()}' : ''}',
       category: 'Safety',
     );
+    _rpc('admin_update_safety', {
+      'p_event': id,
+      'p_status': switch (status) {
+        SafetyStatus.acknowledged => 'in_progress',
+        SafetyStatus.resolved => 'resolved',
+        _ => 'open',
+      },
+      'p_note': hasNote ? '$_me: ${note.trim()}' : null,
+    });
   }
 
   // ---- Support ----
@@ -366,6 +563,15 @@ class AdminStore extends Notifier<AdminData> {
       'Replied to ticket $id${status == TicketStatus.resolved ? ' and resolved it' : ''}',
       category: 'Support',
     );
+    _rpc('admin_reply_ticket', {
+      'p_ticket': id,
+      'p_text': text.trim(),
+      'p_status': switch (status) {
+        TicketStatus.resolved => 'resolved',
+        TicketStatus.open => 'open',
+        _ => 'in_progress',
+      },
+    });
   }
 
   void setTicketStatus(String id, TicketStatus s) {
@@ -375,6 +581,15 @@ class AdminStore extends Notifier<AdminData> {
       ],
     );
     _log('Marked ticket $id as ${s.label.toLowerCase()}', category: 'Support');
+    _rpc('admin_reply_ticket', {
+      'p_ticket': id,
+      'p_text': null,
+      'p_status': switch (s) {
+        TicketStatus.resolved => 'resolved',
+        TicketStatus.open => 'open',
+        _ => 'in_progress',
+      },
+    });
   }
 
   // ---- Pricing & settings ----
@@ -387,6 +602,19 @@ class AdminStore extends Notifier<AdminData> {
       'Updated ${p.name} prices: base ${naira(p.baseFare)}, ${naira(p.perKm)}/km, ${naira(p.perMinute)}/min, min ${naira(p.minimumFare)}',
       category: 'Pricing',
     );
+    _server(
+      () => Backend.db
+          .from('ride_types')
+          .update({
+            'base_fare': p.baseFare,
+            'per_km': p.perKm,
+            'per_minute': p.perMinute,
+            'minimum_fare': p.minimumFare,
+            'active': p.active,
+          })
+          .eq('id', p.id),
+      audit: 'Updated ${p.name} prices',
+    );
   }
 
   void savePlanPrice(PlanPrice p) {
@@ -397,11 +625,40 @@ class AdminStore extends Notifier<AdminData> {
       'Updated ${p.kind} subscription: ${naira(p.daily)}/day, ${naira(p.weekly)}/week, ${naira(p.monthly)}/month',
       category: 'Pricing',
     );
+    _server(
+      () => Backend.db
+          .from('plan_prices')
+          .update({'daily': p.daily, 'weekly': p.weekly, 'monthly': p.monthly})
+          .eq('kind', p.kind.toLowerCase()),
+      audit: 'Updated ${p.kind} subscription prices',
+    );
   }
 
   void saveSettings(AppSettings s, String what) {
     state = state.copyWith(settings: s);
     _log(what, category: 'Settings');
+    _server(
+      () => Backend.db
+          .from('app_settings')
+          .update({
+            'commission_rate': s.commissionRate,
+            'debt_limit': s.debtLimit,
+            'waiting_fee_per_minute': s.waitingFeePerMin,
+            'waiting_free_minutes': s.freeWaitMinutes,
+            'no_show_fee': s.noShowFee,
+            'off_route_meters': s.offRouteMetres,
+            'sos_response_seconds': s.routeAlertTimeoutSeconds,
+            'surge_enabled': s.surgeEnabled,
+            'max_surge': s.maxSurge > 1.3 ? 1.3 : s.maxSurge,
+            'min_payout': s.minPayout,
+            'rider_referral_reward': s.referralRiderReward,
+            'driver_referral_reward': s.referralDriverReward,
+            'maintenance_mode': s.maintenanceMode,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', 1),
+      audit: what,
+    );
   }
 
   void toggleChannel(String id, bool enabled) {
@@ -423,6 +680,25 @@ class AdminStore extends Notifier<AdminData> {
   void addPromo(Promo p) {
     state = state.copyWith(promos: [p, ...state.promos]);
     _log('Created promo ${p.code} (${p.offer})', category: 'Promos');
+    if (!p.percent) {
+      ref
+          .read(storeErrorProvider.notifier)
+          .set('Only percentage promos are supported for now.');
+      return;
+    }
+    _server(
+      () => Backend.db.from('promos').insert({
+        'code': p.code.toUpperCase(),
+        'title': p.description,
+        'percent_off': p.value,
+        'max_off': p.maxDiscount,
+        'usage_limit': p.limit > 0 ? p.limit : null,
+        'ends_at': p.expires.toUtc().toIso8601String(),
+        'new_riders_only': p.newRidersOnly,
+        'active': p.active,
+      }),
+      audit: 'Created promo ${p.code} (${p.offer})',
+    );
   }
 
   void togglePromo(String code, bool active) {
@@ -433,6 +709,11 @@ class AdminStore extends Notifier<AdminData> {
       ],
     );
     _log('${active ? 'Activated' : 'Paused'} promo $code', category: 'Promos');
+    _server(
+      () =>
+          Backend.db.from('promos').update({'active': active}).eq('code', code),
+      audit: '${active ? 'Activated' : 'Paused'} promo $code',
+    );
   }
 
   void sendBroadcast(String audience, String title, String body) {
@@ -460,6 +741,11 @@ class AdminStore extends Notifier<AdminData> {
       'Sent notification "$title" to $audience ($reach people)',
       category: 'Notifications',
     );
+    _rpc('send_broadcast', {
+      'p_audience': audience.toLowerCase(),
+      'p_title': title,
+      'p_body': body,
+    });
   }
 
   // ---- Staff ----
@@ -477,6 +763,25 @@ class AdminStore extends Notifier<AdminData> {
           : 'Invited ${m.name} (${m.email}) as ${m.role.label}',
       category: 'Staff',
     );
+    if (exists) {
+      _server(
+        () => Backend.db
+            .from('staff')
+            .update({'full_name': m.name, 'role': roleToDb(m.role)})
+            .eq('id', m.id),
+        audit: 'Changed ${m.name} to ${m.role.label}',
+      );
+    } else {
+      _server(
+        () => Backend.db.from('staff_invites').upsert({
+          'email': m.email.trim().toLowerCase(),
+          'full_name': m.name,
+          'role': roleToDb(m.role),
+          'invited_by': Backend.user!.id,
+        }),
+        audit: 'Invited ${m.name} (${m.email}) as ${m.role.label}',
+      );
+    }
   }
 
   void setStaffActive(String id, bool active) {
@@ -490,6 +795,10 @@ class AdminStore extends Notifier<AdminData> {
     _log(
       '${active ? 'Restored' : 'Removed'} access for ${m.name}',
       category: 'Staff',
+    );
+    _server(
+      () => Backend.db.from('staff').update({'active': active}).eq('id', id),
+      audit: '${active ? 'Restored' : 'Removed'} access for ${m.name}',
     );
   }
 

@@ -122,8 +122,7 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> signInWithGoogle() =>
-      AuthService.google(mobileScheme: 'goride');
+  Future<void> signInWithGoogle() => AuthService.google(mobileScheme: 'goride');
 
   /// Loads the signed-in rider's profile. Returns false if not signed in.
   Future<bool> loadProfile() async {

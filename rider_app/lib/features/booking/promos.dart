@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart'
+    show Backend, parseTime, userIdProvider;
 
 import '../../core/utils/money.dart';
 
@@ -44,44 +46,44 @@ class Promo {
   }
 }
 
-/// Mock promos. Later: `promos` table managed from the admin dashboard.
-final promosProvider = Provider<List<Promo>>((ref) {
-  final now = DateTime.now();
-  final end = DateTime(now.year, now.month + 2, 0);
-  return [
-    Promo(
-      code: 'GORIDE20',
-      title: 'Best Deal: 20% OFF',
-      percentOff: 20,
-      maxDiscount: 1000,
-      minSpend: 0,
-      validUntil: end,
-    ),
-    Promo(
-      code: 'NEWRIDER',
-      title: '15% OFF: New Rider Promotion',
-      percentOff: 15,
-      maxDiscount: 1500,
-      minSpend: 2000,
-      validUntil: end,
-    ),
-    Promo(
-      code: 'KEKE10',
-      title: '10% OFF all Keke rides',
-      percentOff: 10,
-      maxDiscount: 300,
-      minSpend: 0,
-      validUntil: end,
-      rideTypeIds: const {'keke'},
-    ),
-    Promo(
-      code: 'COMFY25',
-      title: '25% OFF GoRide Comfort',
-      percentOff: 25,
-      maxDiscount: 2000,
-      minSpend: 3000,
-      validUntil: end,
-      rideTypeIds: const {'comfort'},
-    ),
-  ];
-});
+/// Active promo codes from Supabase (`promos`), managed in the admin.
+class PromosController extends Notifier<List<Promo>> {
+  @override
+  List<Promo> build() {
+    final uid = ref.watch(userIdProvider);
+    if (uid == null) return const [];
+    Future.microtask(_load);
+    return const [];
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await Backend.db
+          .from('promos')
+          .select()
+          .eq('active', true)
+          .order('percent_off', ascending: false);
+      final now = DateTime.now();
+      state = [
+        for (final r in rows)
+          if (parseTime(r['ends_at'])?.isAfter(now) ?? true)
+            Promo(
+              code: r['code'] as String,
+              title: r['title'] as String,
+              percentOff: r['percent_off'] as int,
+              maxDiscount: r['max_off'] as int,
+              minSpend: r['min_spend'] as int,
+              validUntil:
+                  parseTime(r['ends_at']) ?? now.add(const Duration(days: 365)),
+              rideTypeIds: r['ride_type_id'] == null
+                  ? null
+                  : {r['ride_type_id'] as String},
+            ),
+      ];
+    } catch (_) {}
+  }
+}
+
+final promosProvider = NotifierProvider<PromosController, List<Promo>>(
+  PromosController.new,
+);

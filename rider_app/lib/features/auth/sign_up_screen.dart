@@ -34,10 +34,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     try {
       await ref
           .read(authControllerProvider.notifier)
-          .requestOtp(
-            email: _email.text,
-            flow: AuthFlow.signUp,
-          );
+          .requestOtp(email: _email.text, flow: AuthFlow.signUp);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -135,9 +132,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     .signInWithGoogle();
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AuthService.message(e))),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(AuthService.message(e))));
               }
             },
           ),

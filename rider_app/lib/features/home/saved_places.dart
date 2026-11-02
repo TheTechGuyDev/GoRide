@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart' show Backend, userIdProvider;
 import 'package:latlong2/latlong.dart';
 
 class SavedPlace {
@@ -46,45 +47,73 @@ class SavedPlace {
   }
 }
 
-/// Saved addresses (Lagos samples). Later: `saved_places` table in Supabase.
+/// Saved addresses, stored in Supabase (`saved_places`).
 class SavedPlacesController extends Notifier<List<SavedPlace>> {
   static const maxPlaces = 10;
 
   @override
-  List<SavedPlace> build() => const [
-    SavedPlace(
-      id: 'home',
-      label: 'Home',
-      address: '12 Admiralty Way, Lekki Phase 1, Lagos',
-      position: LatLng(6.4474, 3.4720),
-      details: 'Estate gate 2, Block C',
-    ),
-    SavedPlace(
-      id: 'office',
-      label: 'Office',
-      address: '1 Adeola Odeku St, Victoria Island, Lagos',
-      position: LatLng(6.4310, 3.4215),
-    ),
-    SavedPlace(
-      id: 'mum',
-      label: 'Mum\'s House',
-      address: '5 Allen Avenue, Ikeja, Lagos',
-      position: LatLng(6.6018, 3.3515),
-    ),
-  ];
+  List<SavedPlace> build() {
+    final uid = ref.watch(userIdProvider);
+    if (uid == null) return const [];
+    Future.microtask(_load);
+    return const [];
+  }
 
-  void save(SavedPlace p) {
+  Future<void> _load() async {
+    try {
+      final rows = await Backend.db
+          .from('saved_places')
+          .select()
+          .order('created_at');
+      state = [
+        for (final r in rows)
+          SavedPlace(
+            id: r['id'] as String,
+            label: r['label'] as String,
+            address: r['address'] as String,
+            position: LatLng(
+              (r['lat'] as num).toDouble(),
+              (r['lng'] as num).toDouble(),
+            ),
+            details: (r['details'] as String?) ?? '',
+          ),
+      ];
+    } catch (_) {}
+  }
+
+  Future<void> save(SavedPlace p) async {
     final i = state.indexWhere((e) => e.id == p.id);
-    if (i == -1) {
-      if (state.length >= maxPlaces) return;
-      state = [...state, p];
-    } else {
-      state = [...state]..[i] = p;
+    if (i == -1 && state.length >= maxPlaces) return;
+    final row = {
+      'user_id': Backend.user!.id,
+      'label': p.label,
+      'address': p.address,
+      'lat': p.position.latitude,
+      'lng': p.position.longitude,
+      'details': p.details,
+    };
+    // Optimistic update so the list changes immediately.
+    state = i == -1 ? [...state, p] : ([...state]..[i] = p);
+    try {
+      if (i == -1 || !_isUuid(p.id)) {
+        await Backend.db.from('saved_places').insert(row);
+      } else {
+        await Backend.db.from('saved_places').update(row).eq('id', p.id);
+      }
+    } finally {
+      await _load();
     }
   }
 
-  void remove(String id) => state = state.where((e) => e.id != id).toList();
+  Future<void> remove(String id) async {
+    state = state.where((e) => e.id != id).toList();
+    if (_isUuid(id)) {
+      await Backend.db.from('saved_places').delete().eq('id', id);
+    }
+  }
 }
+
+bool _isUuid(String id) => id.length == 36 && id.contains('-');
 
 final savedPlacesProvider =
     NotifierProvider<SavedPlacesController, List<SavedPlace>>(

@@ -8,8 +8,6 @@ import 'package:latlong2/latlong.dart';
 import '../../core/notifications/notification_service.dart';
 import '../driving/driver_controller.dart';
 import '../earnings/earnings_controller.dart';
-import '../registration/plans.dart';
-import '../registration/registration_controller.dart';
 
 enum TripStage { toPickup, arrived, onTrip, atDestination, completed }
 
@@ -113,9 +111,11 @@ class ActiveTrip {
   }
 }
 
-/// The current trip, simulated along the OSRM route.
-/// Later: each GPS fix is written to `trip_locations` so the rider sees the
-/// car move, and the server checks the route (rider's off-route alert).
+/// The current trip. Every step is confirmed on the server (`trips`):
+/// arrive, start with the rider's PIN, complete (money moves), cancel.
+/// The car's position is written to `driver_locations` so the rider sees it.
+/// In the web preview the car drives itself along the route; on phones the
+/// position comes from GPS.
 class TripController extends Notifier<ActiveTrip?> {
   static const tick = Duration(milliseconds: 250);
 
@@ -130,16 +130,21 @@ class TripController extends Notifier<ActiveTrip?> {
 
   Timer? _timer;
   Timer? _waitTimer;
-  final _rand = Random();
-  String? _lastRouteCheck;
+  Timer? _poll;
+  RealtimeChannel? _channel;
 
   @override
   ActiveTrip? build() {
-    ref.onDispose(() {
-      _timer?.cancel();
-      _waitTimer?.cancel();
-    });
+    ref.onDispose(_stop);
     return null;
+  }
+
+  void _stop() {
+    _timer?.cancel();
+    _waitTimer?.cancel();
+    _poll?.cancel();
+    _channel?.unsubscribe();
+    _channel = null;
   }
 
   NotificationsController get _notes =>
@@ -147,19 +152,119 @@ class TripController extends Notifier<ActiveTrip?> {
 
   void start(RideRequest req) {
     final pos = ref.read(driverProvider).position;
-    ref.read(driverProvider.notifier).pauseRequests();
+    final driver = ref.read(driverProvider.notifier);
+    driver.pauseRequests();
+    driver.keepSharingLocation();
     state = ActiveTrip(
       request: req,
       stage: TripStage.toPickup,
       position: pos,
       acceptedAt: DateTime.now(),
-      messages: [
-        if (req.pickupNote != null)
-          ChatMessage(req.pickupNote!, fromDriver: false, time: DateTime.now()),
-      ],
-      unread: req.pickupNote != null ? 1 : 0,
     );
+    _listen(req.id);
     _drive();
+  }
+
+  /// Picks up a trip still running after the app was closed or reloaded.
+  /// Returns true if there is one.
+  Future<bool> resume() async {
+    final uid = Backend.user?.id;
+    if (uid == null || state != null) return state != null;
+    final row = await Backend.db
+        .from('trips')
+        .select(tripColumns)
+        .eq('driver_id', uid)
+        .inFilter('status', ['accepted', 'arrived', 'on_trip'])
+        .order('accepted_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    if (row == null) return false;
+    final driver = ref.read(driverProvider.notifier);
+    final req = await driver.buildRequest(row);
+    if (req == null) return false;
+    final stage = switch (row['status']) {
+      'arrived' => TripStage.arrived,
+      'on_trip' => TripStage.onTrip,
+      _ => TripStage.toPickup,
+    };
+    final pos = stage == TripStage.toPickup
+        ? ref.read(driverProvider).position
+        : req.pickup.position;
+    driver.pauseRequests();
+    state = ActiveTrip(
+      request: req,
+      stage: stage,
+      position: pos,
+      progress: stage == TripStage.arrived ? 1 : 0,
+      acceptedAt: parseTime(row['accepted_at']),
+      arrivedAt: parseTime(row['arrived_at']),
+      startedAt: parseTime(row['started_at']),
+    );
+    await driver.goOnline();
+    driver.pauseRequests();
+    _listen(req.id);
+    if (stage != TripStage.arrived) _drive();
+    return true;
+  }
+
+  /// Rider messages and rider cancellation arrive live.
+  void _listen(String tripId) {
+    _channel = Backend.db
+        .channel('drv-trip-$tripId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'trip_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'trip_id',
+            value: tripId,
+          ),
+          callback: (p) {
+            final r = p.newRecord;
+            if (r['sender_id'] != Backend.user?.id) {
+              _riderSays(r['body'] as String);
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'trips',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: tripId,
+          ),
+          callback: (p) => _onTripRow(p.newRecord),
+        )
+        .subscribe();
+    _poll = Timer.periodic(const Duration(seconds: 8), (_) async {
+      try {
+        final r = await Backend.db
+            .from('trips')
+            .select('id, status, cancelled_by')
+            .eq('id', tripId)
+            .maybeSingle();
+        if (r != null) _onTripRow(r);
+      } catch (_) {}
+    });
+  }
+
+  void _onTripRow(Map<String, dynamic> r) {
+    final t = state;
+    if (t == null || r['id'] != t.request.id) return;
+    if (r['status'] == 'cancelled' && r['cancelled_by'] == 'rider') {
+      _notes.notify(
+        NotifyCategory.trips,
+        'Rider cancelled the trip',
+        'You are back online for new requests.',
+        route: '/home',
+        id: NotifyIds.trip,
+      );
+      ref.read(earningsProvider.notifier).load();
+      _clear();
+    }
   }
 
   /// Seconds the simulation takes for a leg (kept short for the preview).
@@ -203,20 +308,11 @@ class TripController extends Notifier<ActiveTrip?> {
           );
         }
       }
-
-      // Rider sometimes messages while the driver is on the way.
-      final key = '${t.stage}-${(p * 10).floor()}';
-      if (t.stage == TripStage.toPickup &&
-          key == 'TripStage.toPickup-5' &&
-          _lastRouteCheck != key) {
-        _lastRouteCheck = key;
-        if (_rand.nextBool()) _riderSays('Okay, I\'m coming out now');
-      }
     });
   }
 
-  /// Driver is at the pickup point.
-  void arrived() {
+  /// Driver is at the pickup point; the rider is told.
+  Future<void> arrived() async {
     final t = state;
     if (t == null || t.stage != TripStage.toPickup) return;
     _timer?.cancel();
@@ -239,22 +335,31 @@ class TripController extends Notifier<ActiveTrip?> {
           : (extra.inMinutes + 1) * waitingFeePerMin;
       if (fee != s.waitingFee) state = s.copyWith(waitingFee: fee);
     });
-    Future.delayed(const Duration(seconds: 6), () {
-      if (state?.stage == TripStage.arrived) _riderSays('I see you, coming!');
-    });
+    try {
+      await Backend.db.rpc('driver_arrived', params: {'p_trip': t.request.id});
+    } catch (_) {}
   }
 
-  /// Returns true if the PIN matches and the trip has started.
-  bool startTrip(String pin) {
+  /// Returns null if the PIN matched and the trip started, else a message.
+  Future<String?> startTrip(String pin) async {
     final t = state;
-    if (t == null || t.stage != TripStage.arrived) return false;
-    if (pin != t.request.pin) return false;
-    _waitTimer?.cancel();
-    state = t.copyWith(
-      stage: TripStage.onTrip,
-      progress: 0,
-      startedAt: DateTime.now(),
-    );
+    if (t == null || t.stage != TripStage.arrived) return 'Trip not ready';
+    try {
+      final row = await Backend.db.rpc(
+        'start_trip',
+        params: {'p_trip': t.request.id, 'p_pin': pin},
+      );
+      final fee = ((row as Map)['waiting_fee'] as num?)?.toInt() ?? 0;
+      _waitTimer?.cancel();
+      state = state!.copyWith(
+        stage: TripStage.onTrip,
+        progress: 0,
+        startedAt: DateTime.now(),
+        waitingFee: fee,
+      );
+    } catch (e) {
+      return AuthService.message(e);
+    }
     _notes.notify(
       NotifyCategory.trips,
       'Trip started',
@@ -263,21 +368,20 @@ class TripController extends Notifier<ActiveTrip?> {
       id: NotifyIds.trip,
     );
     _drive();
-    return true;
+    return null;
   }
 
-  /// Tell the rider the driver is taking a different route.
-  /// Live: this sends the rider app a notice so the off-route alarm
-  /// explains itself instead of just going off.
+  /// Tell the rider the driver is taking a different route, so the rider's
+  /// off-route alarm explains itself.
   void announceRouteChange(String reason) {
     final t = state;
     if (t == null) return;
     state = t.copyWith(routeChangeReason: reason);
-    sendMessage('I\'m taking a different route: $reason', auto: true);
+    sendMessage('I\'m taking a different route: $reason');
   }
 
-  /// End the trip at (or near) the destination.
-  void endTrip() {
+  /// End the trip: the server charges the rider and pays the driver.
+  Future<void> endTrip() async {
     final t = state;
     if (t == null) return;
     if (t.stage != TripStage.onTrip && t.stage != TripStage.atDestination) {
@@ -285,98 +389,57 @@ class TripController extends Notifier<ActiveTrip?> {
     }
     _timer?.cancel();
     state = t.copyWith(stage: TripStage.completed, endedAt: DateTime.now());
+    try {
+      final row = await Backend.db.rpc(
+        'complete_trip',
+        params: {'p_trip': t.request.id},
+      );
+      final fee = ((row as Map)['waiting_fee'] as num?)?.toInt();
+      if (fee != null) state = state?.copyWith(waitingFee: fee);
+    } catch (e) {
+      _notes.notify(
+        NotifyCategory.trips,
+        'Could not end the trip',
+        AuthService.message(e),
+        route: '/trip',
+      );
+    }
+    ref.read(earningsProvider.notifier).load();
   }
 
   void markCashCollected() => state = state?.copyWith(cashCollected: true);
 
-  /// Finish: rate the rider, record earnings, go back online.
-  void finish({required int riderRating}) {
+  /// Finish: rate the rider and go back online.
+  Future<void> finish({required int riderRating}) async {
     final t = state;
     if (t == null) return;
-    final req = t.request;
-    final plan = ref.read(registrationProvider).plan ?? const DriverPlan();
-    final commission = plan.commissionOn(t.totalFare);
-    final id = 'T${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
-    final mins = t.startedAt == null
-        ? req.trip.minutes
-        : max(
-            req.trip.minutes,
-            DateTime.now().difference(t.startedAt!).inMinutes,
-          );
-    ref
-        .read(earningsProvider.notifier)
-        .recordTrip(
-          TripRecord(
-            id: id,
-            date: DateTime.now(),
-            riderName: req.riderName,
-            pickup: req.pickup.name,
-            dropoff: req.destination.name,
-            rideTypeId: req.rideType.id,
-            km: double.parse(req.trip.km.toStringAsFixed(1)),
-            minutes: mins,
-            fare: t.totalFare,
-            commission: commission,
-            payment: req.payment,
-            waitingFee: t.waitingFee,
-            ratingGiven: riderRating,
-          ),
-        );
+    try {
+      await Backend.db.rpc(
+        'rate_trip',
+        params: {'p_trip': t.request.id, 'p_stars': riderRating},
+      );
+    } catch (_) {}
     _clear();
-
-    // The rider rates (and sometimes tips) a little later.
-    Future.delayed(Duration(seconds: 6 + _rand.nextInt(5)), () {
-      final stars = _rand.nextInt(8) == 0 ? 4 : 5;
-      ref
-          .read(earningsProvider.notifier)
-          .rateFromRider(
-            id,
-            stars,
-            stars == 5 ? 'Great driver, thank you!' : null,
-          );
-      if (_rand.nextInt(3) == 0) {
-        ref
-            .read(earningsProvider.notifier)
-            .addTip(id, [200, 300, 500, 1000][_rand.nextInt(4)]);
-      }
-    });
+    ref.read(earningsProvider.notifier).load();
   }
 
-  /// Cancel before the trip starts.
-  void cancel(String reason) {
+  /// Cancel before the trip starts (no-show fee is decided by the server).
+  Future<void> cancel(String reason) async {
     final t = state;
     if (t == null) return;
-    final noShow =
-        t.stage == TripStage.arrived &&
-        t.arrivedAt != null &&
-        DateTime.now().difference(t.arrivedAt!) >= noShowAfter &&
-        reason == 'Rider didn\'t show up';
-    final req = t.request;
-    ref
-        .read(earningsProvider.notifier)
-        .recordTrip(
-          TripRecord(
-            id: 'T${DateTime.now().millisecondsSinceEpoch ~/ 1000}',
-            date: DateTime.now(),
-            riderName: req.riderName,
-            pickup: req.pickup.name,
-            dropoff: req.destination.name,
-            rideTypeId: req.rideType.id,
-            km: 0,
-            minutes: 0,
-            fare: noShow ? noShowFee : 0,
-            commission: 0,
-            payment: noShow ? PaymentKind.wallet : req.payment,
-            cancelled: !noShow,
-            cancelReason: noShow ? 'Rider no-show (fee paid)' : reason,
-          ),
-        );
+    final id = t.request.id;
     _clear();
+    try {
+      await Backend.db.rpc(
+        'cancel_trip',
+        params: {'p_trip': id, 'p_reason': reason},
+      );
+    } catch (_) {}
+    ref.read(earningsProvider.notifier).load();
   }
 
   void _clear() {
-    _timer?.cancel();
-    _waitTimer?.cancel();
+    _stop();
     state = null;
     ref.read(driverProvider.notifier).resumeAfterTrip();
   }
@@ -392,17 +455,14 @@ class TripController extends Notifier<ActiveTrip?> {
         ChatMessage(text.trim(), fromDriver: true, time: DateTime.now()),
       ],
     );
-    if (auto) return;
-    // Simulated rider reply.
-    Future.delayed(Duration(seconds: 2 + _rand.nextInt(3)), () {
-      const replies = [
-        'Okay, thank you',
-        'Alright, no problem',
-        'I\'ll be there in a minute',
-        'Thanks!',
-      ];
-      _riderSays(replies[_rand.nextInt(replies.length)]);
-    });
+    Backend.db
+        .from('trip_messages')
+        .insert({
+          'trip_id': t.request.id,
+          'sender_id': Backend.user!.id,
+          'body': text.trim(),
+        })
+        .then((_) {}, onError: (_) {});
   }
 
   void _riderSays(String text) {

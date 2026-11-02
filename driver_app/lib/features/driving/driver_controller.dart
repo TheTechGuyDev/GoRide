@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
@@ -161,26 +160,29 @@ const demandZones = [
   DemandZone(LatLng(6.5170, 3.3850), 900, 1.1, 'Yaba'),
 ];
 
-/// Online/offline and incoming requests. Mock now: requests are generated
-/// near the driver. Later: driver location is written to `driver_locations`
-/// and requests arrive over Supabase Realtime.
 class DriverController extends Notifier<DriverState> {
   static const requestSeconds = 15;
 
   /// Cash commission a driver may owe before they must settle.
   static const debtLimit = 5000;
 
-  final _rand = Random();
   final _routing = RoutingService();
-  Timer? _nextTimer;
   Timer? _countdown;
+  Timer? _publish;
+  Timer? _poll;
+  RealtimeChannel? _requests;
   AudioPlayer? _player;
+  bool _paused = false;
+  LatLng? _lastSent;
+  final _seen = <String>{};
 
   @override
   DriverState build() {
     ref.onDispose(() {
-      _nextTimer?.cancel();
       _countdown?.cancel();
+      _publish?.cancel();
+      _poll?.cancel();
+      _requests?.unsubscribe();
       _player?.dispose();
     });
     final loc = ref.read(locationControllerProvider);
@@ -217,15 +219,31 @@ class DriverController extends Notifier<DriverState> {
     state = state.copyWith(position: loc.position);
   }
 
-  void goOnline() {
+  String? get _uid => Backend.user?.id;
+
+  /// Online: the driver appears on riders' maps and receives requests.
+  Future<void> goOnline() async {
     if (state.online) return;
+    final uid = _uid;
+    if (uid == null) return;
+    syncLocation();
     state = state.copyWith(online: true, onlineSince: DateTime.now());
-    _scheduleNext(first: true);
+    _paused = false;
+    await _sendLocation(force: true, online: true);
+    _publish?.cancel();
+    _publish = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _sendLocation(),
+    );
+    _listen();
   }
 
-  void goOffline() {
-    _nextTimer?.cancel();
+  Future<void> goOffline() async {
     _countdown?.cancel();
+    _publish?.cancel();
+    _poll?.cancel();
+    _requests?.unsubscribe();
+    _requests = null;
     final since = state.onlineSince;
     if (since != null) {
       ref
@@ -239,39 +257,139 @@ class DriverController extends Notifier<DriverState> {
       offered: state.offered,
       accepted: state.accepted,
     );
+    final uid = _uid;
+    if (uid != null) {
+      try {
+        await Backend.db
+            .from('driver_locations')
+            .update({
+              'online': false,
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            })
+            .eq('driver_id', uid);
+      } catch (_) {}
+    }
+  }
+
+  /// Writes the driver's position so riders see the car move.
+  Future<void> _sendLocation({bool force = false, bool? online}) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final p = state.position;
+    const dist = Distance();
+    if (!force && _lastSent != null && dist(_lastSent!, p) < 5) return;
+    _lastSent = p;
+    final reg = ref.read(registrationProvider);
+    try {
+      await Backend.db.from('driver_locations').upsert({
+        'driver_id': uid,
+        'lat': p.latitude,
+        'lng': p.longitude,
+        'heading': state.heading,
+        'online': ?online,
+        'ride_type_id': ?reg.vehicle?.rideTypeId,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
+  /// Keeps sharing the position during a trip even if requests are paused.
+  void keepSharingLocation() {
+    if (_publish == null || !_publish!.isActive) {
+      _publish = Timer.periodic(
+        const Duration(seconds: 3),
+        (_) => _sendLocation(),
+      );
+    }
   }
 
   void updatePrefs(TripPreferences p) => state = state.copyWith(prefs: p);
 
   /// Called when a trip ends so new requests start coming again.
   void resumeAfterTrip() {
-    if (state.online) _scheduleNext();
+    _paused = false;
+    if (state.online) _checkOpenRequests();
   }
 
   /// Pause requests while on a trip.
   void pauseRequests() {
-    _nextTimer?.cancel();
+    _paused = true;
     _countdown?.cancel();
   }
 
-  void _scheduleNext({bool first = false}) {
-    _nextTimer?.cancel();
-    final wait = first ? 5 + _rand.nextInt(4) : 9 + _rand.nextInt(10);
-    _nextTimer = Timer(Duration(seconds: wait), _offerRequest);
+  /// New ride requests arrive live; a poll catches anything missed.
+  void _listen() {
+    _requests?.unsubscribe();
+    _requests = Backend.db
+        .channel('requests-${_uid ?? ''}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'trips',
+          callback: (_) => _checkOpenRequests(),
+        )
+        .subscribe();
+    _poll?.cancel();
+    _poll = Timer.periodic(
+      const Duration(seconds: 6),
+      (_) => _checkOpenRequests(),
+    );
+    _checkOpenRequests();
   }
 
-  /// Preview button: get a request right now.
-  void requestNow() {
-    if (!state.online || state.request != null || state.searching) return;
-    _nextTimer?.cancel();
-    _offerRequest();
+  /// Preview button: look for a request right now.
+  void requestNow() => _checkOpenRequests();
+
+  Future<void> _checkOpenRequests() async {
+    if (!state.online || _paused || state.request != null || state.searching) {
+      return;
+    }
+    final reg = ref.read(registrationProvider);
+    final allowed = (reg.vehicle?.eligibleTypes ?? const <RideType>[])
+        .map((r) => r.id)
+        .where(
+          (id) =>
+              state.prefs.rideTypes.isEmpty ||
+              state.prefs.rideTypes.contains(id),
+        )
+        .toList();
+    if (allowed.isEmpty) return;
+    try {
+      final rows = await Backend.db
+          .from('trips')
+          .select(tripColumns)
+          .eq('status', 'requested')
+          .isFilter('driver_id', null)
+          .inFilter('ride_type_id', allowed)
+          .order('requested_at')
+          .limit(10);
+      const dist = Distance();
+      final pos = state.position;
+      final maxMetres = state.prefs.maxPickupKm * 1000;
+      for (final r in rows) {
+        final id = r['id'] as String;
+        if (_seen.contains(id)) continue;
+        if (!state.prefs.acceptCash && r['payment'] == 'cash') continue;
+        final pickup = LatLng(
+          (r['pickup_lat'] as num).toDouble(),
+          (r['pickup_lng'] as num).toDouble(),
+        );
+        if (dist(pos, pickup) > maxMetres) continue;
+        _seen.add(id);
+        await _offer(r);
+        return;
+      }
+    } catch (_) {}
   }
 
-  Future<void> _offerRequest() async {
-    if (!state.online || state.request != null) return;
+  Future<void> _offer(Map<String, dynamic> r) async {
+    if (!state.online || _paused || state.request != null) return;
     state = state.copyWith(searching: true);
-    final req = await _buildRequest();
-    if (!state.online) return;
+    final req = await _buildRequest(r);
+    if (!state.online || _paused || req == null) {
+      state = state.copyWith(searching: false);
+      return;
+    }
     state = state.copyWith(
       request: req,
       secondsLeft: requestSeconds,
@@ -287,7 +405,6 @@ class DriverController extends Notifier<DriverState> {
           '${req.toPickup.minutes} min away · ${req.pickup.name} to ${req.destination.name}',
           route: '/home',
           id: NotifyIds.request,
-          // The request card is already on screen.
           banner: false,
         );
     _countdown?.cancel();
@@ -311,14 +428,21 @@ class DriverController extends Notifier<DriverState> {
     }
   }
 
-  /// Returns the accepted request (caller starts the trip).
-  RideRequest? accept() {
+  /// Takes the request on the server. Returns null (with a message) if
+  /// another driver got it first or the rider cancelled.
+  Future<(RideRequest?, String?)> accept() async {
     final req = state.request;
-    if (req == null) return null;
+    if (req == null) return (null, null);
     _countdown?.cancel();
-    _nextTimer?.cancel();
-    state = state.copyWith(clearRequest: true, accepted: state.accepted + 1);
-    return req;
+    state = state.copyWith(clearRequest: true);
+    try {
+      await Backend.db.rpc('accept_trip', params: {'p_trip': req.id});
+    } catch (e) {
+      _checkOpenRequests();
+      return (null, AuthService.message(e));
+    }
+    state = state.copyWith(accepted: state.accepted + 1);
+    return (req, null);
   }
 
   void decline({bool missed = false}) {
@@ -333,128 +457,57 @@ class DriverController extends Notifier<DriverState> {
             'Requests last $requestSeconds seconds. Keep the app open while online.',
           );
     }
-    _scheduleNext();
+    Future.delayed(const Duration(seconds: 2), _checkOpenRequests);
   }
 
-  Future<RideRequest> _buildRequest() async {
-    final reg = ref.read(registrationProvider);
-    final vehicle = reg.vehicle;
-    final allowed = vehicle?.eligibleTypes ?? [rideTypes[2]];
-    final chosen = state.prefs.rideTypes.isEmpty
-        ? allowed
-        : allowed.where((r) => state.prefs.rideTypes.contains(r.id)).toList();
-    final rideType = (chosen.isEmpty
-        ? allowed
-        : chosen)[_rand.nextInt((chosen.isEmpty ? allowed : chosen).length)];
+  Future<RideRequest?> buildRequest(Map<String, dynamic> r) => _buildRequest(r);
 
-    final pos = state.position;
-    const dist = Distance();
-    final byDistance = [...lagosPlaces]
-      ..sort((a, b) => dist(pos, a.position).compareTo(dist(pos, b.position)));
-
-    Place pickup;
-    if (dist(pos, byDistance.first.position) < 6000) {
-      pickup = byDistance[_rand.nextInt(3)];
-    } else {
-      // Driver is outside central Lagos: make a pickup nearby.
-      final p = offsetPoint(
-        pos,
-        600 + _rand.nextDouble() * 1200,
-        _rand.nextDouble() * 360,
-      );
-      pickup = Place(
-        id: 'near',
-        name: 'Pickup near you',
-        address: 'Pin on map',
-        position: p,
-      );
-    }
-
-    Place destination;
-    final dest = state.prefs.destination;
-    if (dest != null) {
-      destination = dest;
-    } else if (pickup.id == 'near') {
-      final p = offsetPoint(
-        pickup.position,
-        3000 + _rand.nextDouble() * 6000,
-        _rand.nextDouble() * 360,
-      );
-      destination = Place(
-        id: 'drop',
-        name: 'Drop-off point',
-        address: 'Pin on map',
-        position: p,
-      );
-    } else {
-      final candidates = lagosPlaces
-          .where((p) => p != pickup && dist(pickup.position, p.position) > 2500)
-          .toList();
-      destination = candidates[_rand.nextInt(candidates.length)];
-    }
-
+  Future<RideRequest?> _buildRequest(Map<String, dynamic> r) async {
+    final type = rideTypes.where((t) => t.id == r['ride_type_id']).firstOrNull;
+    if (type == null) return null;
+    final pickup = Place(
+      id: 'pickup',
+      name: r['pickup_address'] as String,
+      address: r['pickup_address'] as String,
+      position: LatLng(
+        (r['pickup_lat'] as num).toDouble(),
+        (r['pickup_lng'] as num).toDouble(),
+      ),
+    );
+    final destination = Place(
+      id: 'drop',
+      name: r['dropoff_address'] as String,
+      address: r['dropoff_address'] as String,
+      position: LatLng(
+        (r['dropoff_lat'] as num).toDouble(),
+        (r['dropoff_lng'] as num).toDouble(),
+      ),
+    );
+    Map<String, dynamic>? rider;
+    try {
+      final j = await Backend.db.rpc('trip_rider', params: {'p_trip': r['id']});
+      if (j != null) rider = Map<String, dynamic>.from(j as Map);
+    } catch (_) {}
     final results = await Future.wait([
-      _routing.route(pos, pickup.position),
+      _routing.route(state.position, pickup.position),
       _routing.route(pickup.position, destination.position),
     ]);
-    final surge = _surgeAt(pickup.position);
-    final fare = roundFare(rideType.fareFor(results[1]).total * surge);
-    var payment = switch (_rand.nextInt(10)) {
-      < 5 => PaymentKind.cash,
-      < 8 => PaymentKind.wallet,
-      _ => PaymentKind.card,
-    };
-    if (!state.prefs.acceptCash && payment == PaymentKind.cash) {
-      payment = PaymentKind.wallet;
-    }
-    const riders = [
-      'Adaeze Okafor',
-      'Bola Adeyemi',
-      'Chinedu Eze',
-      'Damilola Ojo',
-      'Emeka Nwosu',
-      'Funmi Lawal',
-      'Ibrahim Musa',
-      'Kemi Adebayo',
-      'Ngozi Obi',
-      'Segun Williams',
-      'Tolu Bankole',
-      'Zainab Bello',
-    ];
-    const notes = [
-      'I\'m at the main gate',
-      'Call me when you arrive',
-      'Blue gate opposite the pharmacy',
-      null,
-      null,
-      null,
-    ];
+    final name = (rider?['name'] as String?)?.trim();
     return RideRequest(
-      id: 'R${DateTime.now().millisecondsSinceEpoch}',
-      riderName: riders[_rand.nextInt(riders.length)],
-      riderRating: 4.5 + _rand.nextInt(5) / 10,
-      riderTrips: 3 + _rand.nextInt(180),
+      id: r['id'] as String,
+      riderName: name == null || name.isEmpty ? 'GoRide rider' : name,
+      riderRating: (rider?['rating'] as num?)?.toDouble() ?? 5,
+      riderTrips: (rider?['trips'] as num?)?.toInt() ?? 0,
       pickup: pickup,
       destination: destination,
-      rideType: rideType,
-      payment: payment,
+      rideType: type,
+      payment: r['payment'] == 'cash' ? PaymentKind.cash : PaymentKind.wallet,
       toPickup: results[0],
       trip: results[1],
-      fare: fare,
-      pin: (1000 + _rand.nextInt(9000)).toString(),
-      surge: surge,
-      pickupNote: notes[_rand.nextInt(notes.length)],
+      fare: (r['fare'] as num).toInt(),
+      pin: '',
+      surge: (r['surge'] as num?)?.toDouble() ?? 1,
     );
-  }
-
-  double _surgeAt(LatLng p) {
-    const dist = Distance();
-    for (final z in demandZones) {
-      if (dist(p, z.centre) <= z.radiusM) {
-        return z.multiplier > maxSurge ? maxSurge : z.multiplier;
-      }
-    }
-    return 1.0;
   }
 }
 

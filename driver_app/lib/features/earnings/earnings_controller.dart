@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:goride_core/goride_core.dart';
@@ -251,394 +249,181 @@ class EarningsState {
 
 String dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
 
-/// Trips, wallet and payouts. Mock now; Supabase tables later.
+/// Trips, wallet and payouts from Supabase. Money only moves on the
+/// server: trip earnings, commission, tips, payouts and subscriptions.
 class EarningsController extends Notifier<EarningsState> {
-  int _seq = 0;
-  String _id(String p) => '$p${DateTime.now().millisecondsSinceEpoch}${_seq++}';
+  RealtimeChannel? _channel;
 
   @override
-  EarningsState build() => const EarningsState();
-
-  void _notify(NotifyCategory c, String title, String body, {String? route}) {
-    ref
-        .read(notificationsProvider.notifier)
-        .notify(c, title, body, route: route);
+  EarningsState build() {
+    ref.onDispose(() => _channel?.unsubscribe());
+    return const EarningsState();
   }
 
-  /// A trip just finished: record it and move money.
-  void recordTrip(TripRecord trip) {
-    final txs = <WalletTx>[];
-    if (!trip.cancelled) {
-      if (trip.payment == PaymentKind.cash) {
-        if (trip.commission > 0) {
-          txs.add(
-            WalletTx(
-              id: _id('tx'),
-              type: TxType.cashCommission,
-              amount: -trip.commission,
-              date: trip.date,
-              title: 'Commission on cash trip',
-              subtitle: 'You collected ${naira(trip.fare)} cash',
-            ),
-          );
-        }
-      } else {
-        txs.add(
-          WalletTx(
-            id: _id('tx'),
-            type: TxType.tripEarning,
-            amount: trip.fare - trip.commission,
-            date: trip.date,
-            title: 'Trip with ${trip.riderName}',
-            subtitle: trip.commission > 0
-                ? '${naira(trip.fare)} fare, ${naira(trip.commission)} commission'
-                : '${naira(trip.fare)} fare, no commission (subscription)',
+  /// Loads trips and wallet history, and reloads when money moves.
+  Future<void> load() async {
+    final uid = Backend.user?.id;
+    if (uid == null) return;
+    try {
+      final results = await Future.wait(<Future<dynamic>>[
+        Backend.db.rpc('my_driver_trips'),
+        Backend.db
+            .from('wallet_transactions')
+            .select()
+            .order('created_at', ascending: false)
+            .limit(1000),
+      ]);
+      final trips = [
+        for (final t in results[0] as List)
+          _trip(Map<String, dynamic>.from(t as Map)),
+      ];
+      final txs = [
+        for (final r in results[1] as List)
+          _tx(Map<String, dynamic>.from(r as Map)),
+      ];
+      state = state.copyWith(trips: trips, txs: txs);
+    } catch (_) {}
+    _channel ??= Backend.db
+        .channel('driver-wallet-$uid')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'wallet_transactions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: uid,
           ),
-        );
-      }
-    }
-    state = state.copyWith(
-      trips: [trip, ...state.trips],
-      txs: [...txs.reversed, ...state.txs],
-    );
-    _checkQuest();
+          callback: (p) {
+            final r = p.newRecord;
+            if (r['kind'] == 'tip') {
+              ref
+                  .read(notificationsProvider.notifier)
+                  .notify(
+                    NotifyCategory.earnings,
+                    'You got a tip',
+                    '${naira((r['amount'] as num).toInt())} from your rider. Thank you for great service!',
+                    route: '/wallet',
+                  );
+            }
+            load();
+          },
+        )
+        .subscribe();
   }
 
-  /// Rider added a tip after the trip.
-  void addTip(String tripId, int amount) {
-    state = state.copyWith(
-      trips: [
-        for (final t in state.trips)
-          t.id == tripId ? t.copyWith(tip: t.tip + amount) : t,
-      ],
-      txs: [
-        WalletTx(
-          id: _id('tx'),
-          type: TxType.tip,
-          amount: amount,
-          date: DateTime.now(),
-          title: 'Tip from rider',
-        ),
-        ...state.txs,
-      ],
-    );
-    _notify(
-      NotifyCategory.earnings,
-      'You got a ${naira(amount)} tip',
-      'Your rider appreciated the trip. It\'s in your wallet.',
-      route: '/wallet',
-    );
-  }
-
-  void rateFromRider(String tripId, int stars, String? comment) {
-    state = state.copyWith(
-      trips: [
-        for (final t in state.trips)
-          t.id == tripId
-              ? t.copyWith(ratingFromRider: stars, riderComment: comment)
-              : t,
-      ],
+  static TripRecord _trip(Map<String, dynamic> t) {
+    final cancelled = t['status'] == 'cancelled';
+    return TripRecord(
+      id: t['id'] as String,
+      date:
+          parseTime(
+            t['completed_at'] ?? t['cancelled_at'] ?? t['requested_at'],
+          ) ??
+          DateTime.now(),
+      riderName: ((t['rider_name'] as String?) ?? '').trim().isEmpty
+          ? 'Rider'
+          : t['rider_name'] as String,
+      pickup: t['pickup_address'] as String,
+      dropoff: t['dropoff_address'] as String,
+      rideTypeId: t['ride_type_id'] as String,
+      km: (t['distance_km'] as num).toDouble(),
+      minutes: (t['duration_min'] as num).round(),
+      fare:
+          (t['fare'] as num).toInt() +
+          ((t['waiting_fee'] as num?)?.toInt() ?? 0),
+      commission: (t['commission'] as num?)?.toInt() ?? 0,
+      payment: t['payment'] == 'cash' ? PaymentKind.cash : PaymentKind.wallet,
+      tip: (t['tip'] as num?)?.toInt() ?? 0,
+      waitingFee: (t['waiting_fee'] as num?)?.toInt() ?? 0,
+      ratingFromRider: (t['rider_stars'] as num?)?.toInt(),
+      ratingGiven: (t['driver_stars'] as num?)?.toInt(),
+      riderComment: t['rider_comment'] as String?,
+      cancelled: cancelled,
+      cancelReason: t['cancel_reason'] as String?,
     );
   }
 
-  void _checkQuest() {
-    final q = state.weeklyQuest;
-    if (q.completed && !state.questPaid) {
-      state = state.copyWith(
-        questPaid: true,
-        txs: [
-          WalletTx(
-            id: _id('tx'),
-            type: TxType.bonus,
-            amount: q.reward,
-            date: DateTime.now(),
-            title: 'Weekly quest bonus',
-            subtitle: q.title,
-          ),
-          ...state.txs,
-        ],
-      );
-      _notify(
-        NotifyCategory.incentives,
-        'Quest complete: ${naira(q.reward)} bonus',
-        'You finished ${q.target} trips this week. The bonus is in your wallet.',
-        route: '/wallet',
-      );
-    }
+  static WalletTx _tx(Map<String, dynamic> r) {
+    final amount = (r['amount'] as num).toInt();
+    return WalletTx(
+      id: r['id'] as String,
+      type: switch (r['kind'] as String) {
+        'trip_earning' => TxType.tripEarning,
+        'commission' => TxType.cashCommission,
+        'tip' => TxType.tip,
+        'payout' => TxType.payout,
+        'subscription' => TxType.subscription,
+        'bonus' || 'referral' => TxType.bonus,
+        _ => amount < 0 ? TxType.cashCommission : TxType.topUp,
+      },
+      amount: amount,
+      date: parseTime(r['created_at']) ?? DateTime.now(),
+      title: r['title'] as String,
+    );
   }
+
+  /// After a trip ends the server has already paid the driver; reload.
+  void recordTrip(TripRecord trip) => load();
 
   void addOnlineMinutes(int minutes) {
-    final k = dayKey(DateTime.now());
+    final key = dayKey(DateTime.now());
     state = state.copyWith(
       onlineMinutesByDay: {
         ...state.onlineMinutesByDay,
-        k: (state.onlineMinutesByDay[k] ?? 0) + minutes,
+        key: (state.onlineMinutesByDay[key] ?? 0) + minutes,
       },
     );
   }
 
-  /// Instant payout to the driver's bank (later: Paystack Transfers API,
-  /// started from a Supabase Edge Function).
+  /// Asks for a payout. The money leaves the wallet straight away and the
+  /// GoRide finance team (later: Paystack Transfers) sends it to the bank.
   Future<String> payout(int amount, BankDetails bank) async {
-    await Future.delayed(const Duration(milliseconds: 1600));
-    final ref0 = 'TRF_${DateTime.now().millisecondsSinceEpoch % 100000000}';
-    state = state.copyWith(
-      txs: [
-        WalletTx(
-          id: _id('tx'),
-          type: TxType.payout,
-          amount: -amount,
-          date: DateTime.now(),
-          title: 'Payout to ${bank.bank}',
-          subtitle: '${bank.accountName} · ${bank.accountNumber}',
-        ),
-        ...state.txs,
-      ],
+    final p = await Backend.db.rpc(
+      'request_payout',
+      params: {'p_amount': amount},
     );
-    _notify(
-      NotifyCategory.earnings,
-      'Payout sent',
-      '${naira(amount)} is on its way to your ${bank.bank} account.',
-      route: '/wallet',
-    );
-    return ref0;
+    await load();
+    ref
+        .read(notificationsProvider.notifier)
+        .notify(
+          NotifyCategory.earnings,
+          'Payout requested',
+          '${naira(amount)} to your ${bank.bank} account. We will tell you when it is sent.',
+          route: '/wallet',
+        );
+    return ((p as Map)['id'] as String).substring(0, 8).toUpperCase();
   }
 
-  /// Funds added with Paystack, e.g. to clear cash commission owed.
-  void topUp(int amount, String reference) {
-    state = state.copyWith(
-      txs: [
-        WalletTx(
-          id: _id('tx'),
-          type: TxType.topUp,
-          amount: amount,
-          date: DateTime.now(),
-          title: 'Wallet top up',
-          subtitle: 'Ref $reference',
-        ),
-        ...state.txs,
-      ],
-    );
-  }
+  /// Paystack top-ups are credited by the server; just reload.
+  void topUp(int amount, String reference) => load();
 
-  /// Pay a subscription from the wallet. Returns false if funds are short.
-  bool paySubscription(int amount, SubscriptionPeriod period) {
+  /// Pays a subscription from the wallet on the server.
+  /// Returns false if the wallet is short.
+  Future<bool> paySubscription(int amount, SubscriptionPeriod period) async {
     if (state.balance < amount) return false;
-    state = state.copyWith(
-      txs: [
-        WalletTx(
-          id: _id('tx'),
-          type: TxType.subscription,
-          amount: -amount,
-          date: DateTime.now(),
-          title: '${period.label} subscription',
-          subtitle: 'Keep 100% of every fare',
-        ),
-        ...state.txs,
-      ],
-    );
+    try {
+      await Backend.db.rpc(
+        'pay_subscription',
+        params: {'p_period': period.name},
+      );
+    } catch (_) {
+      return false;
+    }
+    await load();
+    await ref.read(registrationProvider.notifier).load();
     return true;
   }
 
-  /// Preview: realistic history for the demo driver.
-  void seedDemo() {
-    final rand = Random(7);
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final trips = <TripRecord>[];
-    final txs = <WalletTx>[];
-    final online = <String, int>{};
-    var balance = 0;
+  void seedDemo() => load();
 
-    for (var d = 20; d >= 0; d--) {
-      final day = today.subtract(Duration(days: d));
-      // Today: only a few trips so far, done earlier in the morning.
-      final count = d == 0 ? 3 : 3 + rand.nextInt(7);
-      var minute = 6 * 60 + 30 + rand.nextInt(60);
-      online[dayKey(day)] = d == 0 ? 95 : 180 + rand.nextInt(300);
-
-      for (var i = 0; i < count; i++) {
-        final from = _demoPlaces[rand.nextInt(_demoPlaces.length)];
-        var to = _demoPlaces[rand.nextInt(_demoPlaces.length)];
-        if (to == from) {
-          to =
-              _demoPlaces[(_demoPlaces.indexOf(from) + 3) % _demoPlaces.length];
-        }
-        final km = 3 + rand.nextDouble() * 18;
-        final mins = (km * 3.2 + rand.nextInt(15)).round();
-        final type = rand.nextInt(4) == 0 ? 'comfort' : 'car';
-        final rt = rideTypes.firstWhere((r) => r.id == type);
-        final fare = roundFare(
-          max(
-            rt.minimumFare,
-            rt.baseFare + rt.perKm * km + rt.perMinute * mins,
-          ),
-        );
-        final payment = switch (rand.nextInt(10)) {
-          < 5 => PaymentKind.cash,
-          < 8 => PaymentKind.wallet,
-          _ => PaymentKind.card,
-        };
-        final cancelled = rand.nextInt(18) == 0;
-        final commission = (fare * PlanPricing.commissionRate).round();
-        final tip = !cancelled && rand.nextInt(6) == 0
-            ? [200, 300, 500, 1000][rand.nextInt(4)]
-            : 0;
-        final rating = cancelled ? null : (rand.nextInt(9) == 0 ? 4 : 5);
-        minute += 20 + rand.nextInt(55);
-        final date = day.add(Duration(minutes: minute));
-        if (date.isAfter(now)) break;
-        final t = TripRecord(
-          id: 'T${date.millisecondsSinceEpoch ~/ 1000}',
-          date: date,
-          riderName: _demoRiders[rand.nextInt(_demoRiders.length)],
-          pickup: from,
-          dropoff: to,
-          rideTypeId: type,
-          km: double.parse(km.toStringAsFixed(1)),
-          minutes: mins,
-          fare: fare,
-          commission: commission,
-          payment: payment,
-          tip: tip,
-          ratingFromRider: rating,
-          ratingGiven: cancelled ? null : 5,
-          riderComment: rating != null && rand.nextInt(5) == 0
-              ? _demoComments[rand.nextInt(_demoComments.length)]
-              : null,
-          cancelled: cancelled,
-          cancelReason: cancelled ? 'Rider cancelled' : null,
-        );
-        trips.add(t);
-        if (!cancelled) {
-          if (payment == PaymentKind.cash) {
-            txs.add(
-              WalletTx(
-                id: 'c${t.id}',
-                type: TxType.cashCommission,
-                amount: -commission,
-                date: date,
-                title: 'Commission on cash trip',
-                subtitle: 'You collected ${naira(fare)} cash',
-              ),
-            );
-            balance -= commission;
-          } else {
-            txs.add(
-              WalletTx(
-                id: 'e${t.id}',
-                type: TxType.tripEarning,
-                amount: fare - commission,
-                date: date,
-                title: 'Trip with ${t.riderName}',
-                subtitle:
-                    '${naira(fare)} fare, ${naira(commission)} commission',
-              ),
-            );
-            balance += fare - commission;
-          }
-          if (tip > 0) {
-            txs.add(
-              WalletTx(
-                id: 'p${t.id}',
-                type: TxType.tip,
-                amount: tip,
-                date: date.add(const Duration(minutes: 5)),
-                title: 'Tip from ${t.riderName.split(' ').first}',
-              ),
-            );
-            balance += tip;
-          }
-        }
-      }
-      // Payout every 3 days, keeping a little in the wallet.
-      if (d % 3 == 1 && balance > 8000) {
-        final amount = ((balance - 3000) / 1000).floor() * 1000;
-        txs.add(
-          WalletTx(
-            id: 'po$d',
-            type: TxType.payout,
-            amount: -amount,
-            date: day.add(const Duration(hours: 21)),
-            title: 'Payout to GTBank',
-            subtitle: 'TUNDE BAKARE · 0123456789',
-          ),
-        );
-        balance -= amount;
-      }
-    }
-    // No trips yet today (e.g. early morning): no online time either.
-    if (!trips.any((t) => dayKey(t.date) == dayKey(today))) {
-      online[dayKey(today)] = 0;
-    }
-    trips.sort((a, b) => b.date.compareTo(a.date));
-    txs.sort((a, b) => b.date.compareTo(a.date));
-    state = EarningsState(trips: trips, txs: txs, onlineMinutesByDay: online);
-    // Pay this week's quest bonus if the seeded trips already completed it.
-    final q = state.weeklyQuest;
-    if (q.completed) {
-      state = state.copyWith(
-        questPaid: true,
-        txs: [
-          WalletTx(
-            id: 'quest',
-            type: TxType.bonus,
-            amount: q.reward,
-            date: trips.firstWhere((t) => !t.cancelled).date,
-            title: 'Weekly quest bonus',
-            subtitle: q.title,
-          ),
-          ...state.txs,
-        ],
-      );
-    }
+  void reset() {
+    _channel?.unsubscribe();
+    _channel = null;
+    state = const EarningsState();
   }
-
-  void reset() => state = const EarningsState();
 }
 
 final earningsProvider = NotifierProvider<EarningsController, EarningsState>(
   EarningsController.new,
 );
-
-const _demoPlaces = [
-  'Ikeja City Mall',
-  'Yaba Tech',
-  'Lekki Phase 1',
-  'Victoria Island',
-  'Murtala Muhammed Airport',
-  'Surulere',
-  'Ajah',
-  'Maryland Mall',
-  'Ikoyi',
-  'Unilag',
-  'Obalende',
-  'Gbagada',
-  'Festac Town',
-  'Allen Avenue',
-  'Oshodi',
-];
-
-const _demoRiders = [
-  'Adaeze Okafor',
-  'Bola Adeyemi',
-  'Chinedu Eze',
-  'Damilola Ojo',
-  'Emeka Nwosu',
-  'Funke Akindele',
-  'Ibrahim Musa',
-  'Kemi Adebayo',
-  'Ngozi Obi',
-  'Segun Williams',
-  'Tolu Bankole',
-  'Yemi Alade',
-  'Zainab Bello',
-];
-
-const _demoComments = [
-  'Very polite and the car was clean.',
-  'Smooth driving, thank you!',
-  'Knew the route well, avoided traffic.',
-  'Great music and AC was working.',
-  'On time and professional.',
-];

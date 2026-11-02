@@ -617,6 +617,7 @@ class DriverDetailPage extends ConsumerWidget {
                   _DocRow(
                     doc: d.docs[i],
                     canReview: canManage,
+                    photo: () => store.docPhotoUrl(d.id, i),
                     onApprove: () =>
                         store.setDocState(d.id, i, DocState.approved),
                     onReject: () async {
@@ -749,8 +750,12 @@ class _DocRow extends StatelessWidget {
     required this.canReview,
     required this.onApprove,
     required this.onReject,
+    this.photo,
   });
   final DocReview doc;
+
+  /// Loads a short-lived link to the uploaded photo (private storage).
+  final Future<String?> Function()? photo;
   final bool canReview;
   final VoidCallback onApprove;
   final VoidCallback onReject;
@@ -777,27 +782,49 @@ class _DocRow extends StatelessWidget {
                 title: Text(doc.title),
                 content: Container(
                   width: 460,
-                  height: 280,
+                  height: 320,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: AC.field,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AC.border),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.image_outlined, size: 56, color: AC.muted),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Uploaded photo appears here',
-                        style: TextStyle(color: AC.muted),
-                      ),
-                      Text(
-                        '(stored in Supabase Storage once connected)',
-                        style: TextStyle(color: AC.faint, fontSize: 12),
-                      ),
-                    ],
+                  clipBehavior: Clip.antiAlias,
+                  child: FutureBuilder<String?>(
+                    future: photo?.call(),
+                    builder: (ctx, snap) {
+                      if (snap.connectionState != ConnectionState.done) {
+                        return const CircularProgressIndicator();
+                      }
+                      final url = snap.data;
+                      if (url == null) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 56,
+                              color: AC.muted,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No photo uploaded',
+                              style: TextStyle(color: AC.muted),
+                            ),
+                          ],
+                        );
+                      }
+                      return InteractiveViewer(
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) => Text(
+                            'Could not load the photo',
+                            style: TextStyle(color: AC.muted),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
                 actions: [

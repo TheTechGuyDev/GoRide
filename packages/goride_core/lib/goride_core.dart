@@ -25,6 +25,8 @@ export 'src/widgets/appearance_screen.dart';
 export 'src/models/lagos_places.dart';
 
 export 'src/backend/backend.dart';
+export 'src/backend/session.dart';
+
 export 'package:supabase_flutter/supabase_flutter.dart'
     show
         Supabase,

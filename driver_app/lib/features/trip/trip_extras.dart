@@ -359,7 +359,7 @@ class _TripCompleteScreenState extends ConsumerState<TripCompleteScreen> {
                   Text(
                     cash
                         ? 'Collect from ${r.riderFirstName}'
-                        : 'Paid by ${r.payment.label.toLowerCase()}',
+                        : 'Paid by ${r.payment.label}',
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 6),

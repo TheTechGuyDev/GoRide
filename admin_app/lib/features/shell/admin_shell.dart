@@ -27,6 +27,11 @@ class AdminShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(storeErrorProvider, (_, e) {
+      if (e == null) return;
+      toast(context, e);
+      ref.read(storeErrorProvider.notifier).set(null);
+    });
     final wide = MediaQuery.sizeOf(context).width >= 1100;
     final sidebar = _Sidebar(location: location, closeOnTap: !wide);
     return Scaffold(

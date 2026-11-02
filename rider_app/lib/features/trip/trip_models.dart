@@ -39,6 +39,28 @@ class Driver {
       .map((p) => p[0])
       .join();
   String get vehicleLine => '$carModel, $carColor · $plate';
+
+  /// From the `trip_driver` / `my_rides` JSON.
+  factory Driver.fromJson(Map<String, dynamic> j) {
+    final since =
+        DateTime.tryParse((j['member_since'] as String?) ?? '') ??
+        DateTime.now();
+    final years = DateTime.now().difference(since).inDays ~/ 365;
+    return Driver(
+      id: j['id'] as String,
+      name: (j['name'] as String?)?.trim().isNotEmpty == true
+          ? j['name'] as String
+          : 'Your driver',
+      maskedPhone: (j['phone'] as String?) ?? '',
+      rating: (j['rating'] as num?)?.toDouble() ?? 5,
+      trips: (j['trips'] as num?)?.toInt() ?? 0,
+      years: years,
+      memberSince: since,
+      carModel: '${j['make'] ?? ''} ${j['model'] ?? ''}'.trim(),
+      carColor: (j['color'] as String?) ?? '',
+      plate: (j['plate'] as String?) ?? '',
+    );
+  }
 }
 
 enum TripPhase {

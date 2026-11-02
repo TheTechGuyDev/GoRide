@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart' show AuthService;
 
 import '../../core/theme/admin_theme.dart';
-import '../../data/models.dart';
 import '../../data/store.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -13,30 +13,63 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  late StaffMember _who;
+  final _email = TextEditingController();
+  final _code = TextEditingController();
   bool _busy = false;
-  bool _hide = true;
+  bool _codeSent = false;
+  String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _who = ref.read(storeProvider).staff.first;
+  void dispose() {
+    _email.dispose();
+    _code.dispose();
+    super.dispose();
   }
 
-  Future<void> _signIn() async {
-    setState(() => _busy = true);
-    await Future.delayed(const Duration(milliseconds: 700));
+  Future<void> _sendCode() async {
+    final email = _email.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _error = 'Enter your work email');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await AuthService.sendCode(email, createUser: true);
+      setState(() => _codeSent = true);
+    } catch (e) {
+      setState(() => _error = AuthService.message(e));
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _verify() async {
+    if (_code.text.trim().length != 6) {
+      setState(() => _error = 'Enter the 6-digit code from your email');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    String? error;
+    try {
+      await AuthService.verifyCode(_email.text, _code.text.trim());
+      error = await ref.read(sessionProvider.notifier).enter();
+    } catch (e) {
+      error = AuthService.message(e);
+    }
     if (!mounted) return;
-    ref.read(sessionProvider.notifier).signIn(_who);
+    setState(() {
+      _busy = false;
+      _error = error;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final staff = ref
-        .watch(storeProvider)
-        .staff
-        .where((s) => s.active)
-        .toList();
     final wide = MediaQuery.sizeOf(context).width > 900;
 
     final form = Center(
@@ -74,34 +107,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               const SizedBox(height: 6),
               Text('Staff access only.', style: TextStyle(color: AC.muted)),
               const SizedBox(height: 28),
-              Text(
-                'Sign in as (preview)',
-                style: TextStyle(color: AC.muted, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<StaffMember>(
-                initialValue: _who,
-                isExpanded: true,
-                dropdownColor: AC.card,
-                borderRadius: BorderRadius.circular(12),
-                items: [
-                  for (final s in staff)
-                    DropdownMenuItem(
-                      value: s,
-                      child: Text(
-                        '${s.name} · ${s.role.label}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-                onChanged: (v) => setState(() => _who = v ?? _who),
-              ),
-              const SizedBox(height: 16),
               TextField(
-                controller: TextEditingController(text: _who.email),
-                readOnly: true,
+                controller: _email,
+                enabled: !_codeSent,
+                keyboardType: TextInputType.emailAddress,
+                onSubmitted: (_) => _sendCode(),
                 decoration: InputDecoration(
-                  labelText: 'Email',
+                  labelText: 'Work email',
                   prefixIcon: Icon(
                     Icons.mail_outline,
                     color: AC.muted,
@@ -109,35 +121,46 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: TextEditingController(text: 'preview-password'),
-                obscureText: _hide,
-                onSubmitted: (_) => _signIn(),
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: Icon(
-                    Icons.lock_outline,
-                    color: AC.muted,
-                    size: 20,
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _hide
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
+              if (_codeSent) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _code,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  onSubmitted: (_) => _verify(),
+                  decoration: InputDecoration(
+                    labelText: '6-digit code',
+                    counterText: '',
+                    prefixIcon: Icon(
+                      Icons.lock_outline,
                       color: AC.muted,
                       size: 20,
                     ),
-                    onPressed: () => setState(() => _hide = !_hide),
                   ),
                 ),
-              ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() {
+                            _codeSent = false;
+                            _code.clear();
+                          }),
+                    child: const Text('Use another email'),
+                  ),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: TextStyle(color: AC.red, fontSize: 13)),
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 height: 52,
                 child: FilledButton(
-                  onPressed: _busy ? null : _signIn,
+                  onPressed: _busy ? null : (_codeSent ? _verify : _sendCode),
                   style: FilledButton.styleFrom(
                     backgroundColor: AC.primary,
                     shape: RoundedRectangleBorder(
@@ -153,8 +176,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          'Sign in',
+                      : Text(
+                          _codeSent ? 'Sign in' : 'Send code',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -172,7 +195,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   border: Border.all(color: AC.border),
                 ),
                 child: Text(
-                  'Preview: pick a staff member to see what each role can access (${_who.role.description.toLowerCase()}). Real email sign-in with Supabase Auth comes with the backend.',
+                  'We email you a 6-digit code. Only staff added by a Super Admin can open the dashboard.',
                   style: TextStyle(
                     fontSize: 12.5,
                     color: AC.muted,

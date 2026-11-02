@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart' show Backend, userIdProvider;
 
 import '../../core/notifications/notification_service.dart';
 import '../../core/router/routes.dart';
@@ -36,22 +37,34 @@ class PaymentMethod {
   };
 }
 
-/// Mock wallet balance in Naira. Later: `wallets` table + Paystack top-ups.
+/// Wallet balance in Naira, from the server (sum of wallet transactions).
+/// Money only moves on the server: trips, tips, refunds and Paystack top-ups.
 class WalletController extends Notifier<int> {
   @override
-  int build() => 12500;
+  int build() {
+    final uid = ref.watch(userIdProvider);
+    ref.watch(walletBalanceSyncProvider);
+    if (uid == null) return 0;
+    Future.microtask(refresh);
+    return stateOrNull ?? 0;
+  }
 
-  /// Takes money out and records it in the wallet history.
+  Future<void> refresh() async {
+    if (Backend.user == null) return;
+    try {
+      final v = await Backend.db.rpc('my_balance');
+      state = (v as num).toInt();
+    } catch (_) {}
+  }
+
+  /// The server already took the money; just reload.
   void debit(
     int amount, {
     WalletTxType type = WalletTxType.ridePayment,
     String title = 'Ride payment',
-  }) {
-    state = state - amount;
-    _log(amount, type, title, 'GoRide Wallet');
-  }
+  }) => ref.read(walletTransactionsProvider.notifier).refresh();
 
-  /// Adds money (top-up or refund) and records it.
+  /// Top-ups are credited by the server after Paystack confirms the payment.
   void credit(
     int amount, {
     WalletTxType type = WalletTxType.topUp,
@@ -60,42 +73,17 @@ class WalletController extends Notifier<int> {
     String? reference,
     String? id,
   }) {
-    state = state + amount;
-    _log(amount, type, title, method, reference: reference, id: id);
+    ref.read(walletTransactionsProvider.notifier).refresh();
     if (type == WalletTxType.topUp) {
       ref
           .read(notificationsProvider.notifier)
           .notify(
             NotifyCategory.wallet,
-            'Wallet topped up',
-            '${naira(amount)} added. New balance: ${naira(state)}.',
+            'Wallet top-up',
+            'We are confirming your payment of ${naira(amount)}.',
             route: Routes.wallet,
           );
     }
-  }
-
-  void _log(
-    int amount,
-    WalletTxType type,
-    String title,
-    String method, {
-    String? reference,
-    String? id,
-  }) {
-    final stamp = DateTime.now().millisecondsSinceEpoch;
-    ref
-        .read(walletTransactionsProvider.notifier)
-        .add(
-          WalletTx(
-            id: id ?? 'TRX${stamp % 10000000000}',
-            type: type,
-            amount: amount,
-            title: title,
-            method: method,
-            createdAt: DateTime.now(),
-            reference: reference,
-          ),
-        );
   }
 }
 

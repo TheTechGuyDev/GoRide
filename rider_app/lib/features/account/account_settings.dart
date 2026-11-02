@@ -103,4 +103,3 @@ final privacySettingsProvider =
         'crash_reports': true,
       }),
     );
-

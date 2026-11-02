@@ -273,128 +273,286 @@ class RegistrationState {
   }
 }
 
-/// The driver's application and profile.
-/// Later: `drivers`, `vehicles`, `driver_documents` (files in Supabase
-/// Storage) and `driver_bank_accounts` tables, reviewed from the admin
-/// dashboard.
+/// The driver's application and profile, stored in Supabase:
+/// `profiles` (name, phone), `drivers` (vehicle, city, bank, status),
+/// `driver_documents` + the private `driver-docs` storage bucket.
+/// Applications are reviewed from the admin dashboard.
 class RegistrationController extends Notifier<RegistrationState> {
+  RealtimeChannel? _channel;
+
   @override
-  RegistrationState build() => const RegistrationState();
+  RegistrationState build() {
+    ref.onDispose(() => _channel?.unsubscribe());
+    return const RegistrationState();
+  }
+
+  String? get _uid => Backend.user?.id;
+
+  /// Loads everything about this driver; watches for approval changes.
+  Future<void> load() async {
+    final uid = _uid;
+    if (uid == null) return;
+    final results = await Future.wait(<Future<dynamic>>[
+      Backend.db.from('profiles').select().eq('id', uid).single(),
+      Backend.db.from('drivers').select().eq('id', uid).single(),
+      Backend.db.from('driver_documents').select().eq('driver_id', uid),
+    ]);
+    final p = results[0] as Map<String, dynamic>;
+    final d = results[1] as Map<String, dynamic>;
+    final docs = results[2] as List;
+    state = _fromRows(p, d, docs);
+    _watch(uid);
+  }
+
+  RegistrationState _fromRows(
+    Map<String, dynamic> p,
+    Map<String, dynamic> d,
+    List docs,
+  ) {
+    final rideTypeId = d['ride_type_id'] as String?;
+    final plan = d['plan'] == 'subscription'
+        ? DriverPlan(
+            type: PlanType.subscription,
+            period: SubscriptionPeriod.values.byName(
+              d['plan_period'] as String,
+            ),
+            paidUntil: parseTime(d['paid_until']),
+            commissionFreeUntil: parseTime(d['commission_free_until']),
+          )
+        : DriverPlan(
+            commissionFreeUntil: parseTime(d['commission_free_until']),
+          );
+    return RegistrationState(
+      phone: (p['phone'] as String?) ?? '',
+      personal: PersonalDetails(
+        fullName: (p['full_name'] as String?) ?? '',
+        email: (p['email'] as String?) ?? Backend.user?.email ?? '',
+        city: (d['city'] as String?) ?? 'Ibadan',
+        gender: p['gender'] as String?,
+        dateOfBirth: p['date_of_birth'] == null
+            ? null
+            : DateTime.tryParse(p['date_of_birth'] as String),
+        referralCode: (p['referral_code'] as String?) ?? '',
+      ),
+      vehicle: rideTypeId == null
+          ? null
+          : VehicleDetails(
+              rideTypeId: rideTypeId,
+              make: (d['make'] as String?) ?? '',
+              model: (d['model'] as String?) ?? '',
+              year: d['year'] as int?,
+              color: (d['color'] as String?) ?? '',
+              plate: (d['plate'] as String?) ?? '',
+            ),
+      documents: {
+        for (final r in docs)
+          // ignore: use_null_aware_elements
+          if (_docType(r['type'] as String) case final t?)
+            t: DriverDocument(
+              type: t,
+              number: (r['number'] as String?) ?? '',
+              expiry: r['expiry'] == null
+                  ? null
+                  : DateTime.tryParse(r['expiry'] as String),
+              status: switch (r['status']) {
+                'approved' => DocStatus.approved,
+                'rejected' => DocStatus.rejected,
+                'missing' => DocStatus.missing,
+                _ => DocStatus.inReview,
+              },
+              note: r['note'] as String?,
+            ),
+      },
+      // A plan choice is only stored once the driver reaches that step.
+      plan: d['status'] == 'draft' && state.plan == null ? null : plan,
+      bank: d['account_number'] == null
+          ? null
+          : BankDetails(
+              bank: d['bank_name'] as String,
+              accountNumber: d['account_number'] as String,
+              accountName: (d['account_name'] as String?) ?? '',
+            ),
+      status: switch (d['status']) {
+        'approved' => ApprovalStatus.approved,
+        'pending' => ApprovalStatus.pending,
+        'rejected' || 'suspended' => ApprovalStatus.rejected,
+        _ => ApprovalStatus.inProgress,
+      },
+      submittedAt: parseTime(d['submitted_at']),
+      joinedAt: parseTime(d['approved_at']),
+    );
+  }
+
+  static DocType? _docType(String db) => switch (db) {
+    'licence' => DocType.licence,
+    'nin' => DocType.nin,
+    'vehicle_papers' => DocType.vehiclePapers,
+    'insurance' => DocType.insurance,
+    'road_worthiness' => DocType.roadWorthiness,
+    'lasdri' => DocType.lasdri,
+    'vehicle_photo' => DocType.vehiclePhoto,
+    _ => null,
+  };
+
+  static String dbDocType(DocType t) => switch (t) {
+    DocType.licence => 'licence',
+    DocType.nin => 'nin',
+    DocType.vehiclePapers => 'vehicle_papers',
+    DocType.insurance => 'insurance',
+    DocType.roadWorthiness => 'road_worthiness',
+    DocType.lasdri => 'lasdri',
+    DocType.vehiclePhoto => 'vehicle_photo',
+  };
+
+  /// Approval, rejection and document reviews arrive live from the admin.
+  void _watch(String uid) {
+    _channel?.unsubscribe();
+    _channel = Backend.db
+        .channel('driver-$uid')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'drivers',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: uid,
+          ),
+          callback: (_) => load(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'driver_documents',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'driver_id',
+            value: uid,
+          ),
+          callback: (_) => load(),
+        )
+        .subscribe();
+  }
 
   void startFresh(String phone) => state = RegistrationState(phone: phone);
 
-  void savePersonal(PersonalDetails p) => state = state.copyWith(personal: p);
+  /// Name, gender, birthday, city and (first time) phone.
+  Future<void> savePersonal(PersonalDetails p, {String? phone}) async {
+    state = state.copyWith(personal: p, phone: phone);
+    final uid = _uid;
+    if (uid == null) return;
+    String? avatar;
+    if (p.photo != null) {
+      final path = '$uid/avatar.jpg';
+      await Backend.db.storage
+          .from('avatars')
+          .uploadBinary(
+            path,
+            p.photo!,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+      avatar = Backend.db.storage.from('avatars').getPublicUrl(path);
+    }
+    await Backend.db
+        .from('profiles')
+        .update({
+          'full_name': p.fullName,
+          'gender': p.gender,
+          'date_of_birth': p.dateOfBirth?.toIso8601String().substring(0, 10),
+          'avatar_url': ?avatar,
+          if (phone != null && phone.startsWith('+')) 'phone': phone,
+        })
+        .eq('id', uid);
+    if (state.status == ApprovalStatus.inProgress) {
+      await Backend.db.from('drivers').update({'city': p.city}).eq('id', uid);
+    }
+  }
 
-  void saveVehicle(VehicleDetails v) => state = state.copyWith(vehicle: v);
+  Future<void> saveVehicle(VehicleDetails v) async {
+    state = state.copyWith(vehicle: v);
+    final uid = _uid;
+    if (uid == null) return;
+    await Backend.db
+        .from('drivers')
+        .update({
+          'ride_type_id': v.rideTypeId,
+          'make': v.make,
+          'model': v.model,
+          'year': v.year,
+          'color': v.color,
+          'plate': v.plate.toUpperCase(),
+        })
+        .eq('id', uid);
+  }
 
-  void saveDocument(DriverDocument d) =>
-      state = state.copyWith(documents: {...state.documents, d.type: d});
+  /// Uploads the photo to private storage and records it for review.
+  Future<void> saveDocument(DriverDocument d) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final type = dbDocType(d.type);
+    String? path;
+    if (d.image != null) {
+      path = '$uid/$type.jpg';
+      await Backend.db.storage
+          .from('driver-docs')
+          .uploadBinary(
+            path,
+            d.image!,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+    }
+    await Backend.db.from('driver_documents').upsert({
+      'driver_id': uid,
+      'type': type,
+      'number': d.number,
+      'expiry': d.expiry?.toIso8601String().substring(0, 10),
+      'file_path': ?path,
+    }, onConflict: 'driver_id,type');
+    state = state.copyWith(documents: {...state.documents, d.type: d});
+  }
 
   void savePlan(DriverPlan p) => state = state.copyWith(plan: p);
 
-  void saveBank(BankDetails b) => state = state.copyWith(bank: b);
+  Future<void> saveBank(BankDetails b) async {
+    state = state.copyWith(bank: b);
+    if (_uid == null) return;
+    await Backend.db.rpc(
+      'set_bank',
+      params: {
+        'p_bank': b.bank,
+        'p_number': b.accountNumber,
+        'p_name': b.accountName,
+      },
+    );
+  }
 
   Future<void> submit() async {
-    await Future.delayed(const Duration(milliseconds: 900));
+    final uid = _uid;
+    if (uid == null) return;
+    await Backend.db
+        .from('drivers')
+        .update({'status': 'pending'})
+        .eq('id', uid);
     state = state.copyWith(
       status: ApprovalStatus.pending,
       submittedAt: DateTime.now(),
     );
   }
 
-  /// Preview only: what the admin "Approve" button will do.
-  void simulateApproval() {
-    state = state.copyWith(
-      status: ApprovalStatus.approved,
-      joinedAt: DateTime.now(),
-      // New drivers join as founding drivers: 0% commission for 30 days.
-      plan: state.plan?.copyWith(
-        commissionFreeUntil: DateTime.now().add(
-          const Duration(days: PlanPricing.foundingFreeDays),
-        ),
-      ),
-      documents: {
-        for (final e in state.documents.entries)
-          e.key: e.value.copyWith(status: DocStatus.approved),
-      },
-    );
-  }
-
-  /// Preview only: what the admin "Reject document" button will do.
-  void simulateRejection() {
-    state = state.copyWith(
-      status: ApprovalStatus.rejected,
-      documents: {
-        ...state.documents,
-        DocType.roadWorthiness: state
-            .doc(DocType.roadWorthiness)
-            .copyWith(
-              status: DocStatus.rejected,
-              note: 'The photo is blurry. Please upload a clearer one.',
-            ),
-      },
-    );
-  }
-
   /// After fixing rejected documents.
-  void resubmit() => state = state.copyWith(
-    status: ApprovalStatus.pending,
-    submittedAt: DateTime.now(),
-  );
+  Future<void> resubmit() => submit();
 
-  /// Preview: sign in loads an approved demo driver.
-  void loadDemoDriver(String phone) {
-    final now = DateTime.now();
-    DriverDocument ok(DocType t, {int expiresInDays = 400, String no = ''}) =>
-        DriverDocument(
-          type: t,
-          number: no,
-          expiry: t.expires ? now.add(Duration(days: expiresInDays)) : null,
-          status: DocStatus.approved,
-        );
-    state = RegistrationState(
-      phone: phone,
-      personal: PersonalDetails(
-        fullName: 'Tunde Bakare',
-        email: 'tunde.bakare@gmail.com',
-        city: 'Lagos',
-        gender: 'Male',
-        dateOfBirth: DateTime(1988, 4, 12),
-      ),
-      vehicle: const VehicleDetails(
-        rideTypeId: 'comfort',
-        make: 'Toyota',
-        model: 'Corolla',
-        year: 2016,
-        color: 'Silver',
-        plate: 'KJA 482 GD',
-      ),
-      documents: {
-        DocType.licence: ok(DocType.licence, no: 'LAG84729AB12'),
-        DocType.nin: ok(DocType.nin, no: '21948372615'),
-        DocType.vehiclePapers: ok(DocType.vehiclePapers),
-        DocType.insurance: ok(
-          DocType.insurance,
-          expiresInDays: 18,
-          no: 'AXA-MT-77310',
-        ),
-        DocType.roadWorthiness: ok(DocType.roadWorthiness, expiresInDays: 150),
-        DocType.lasdri: ok(DocType.lasdri, expiresInDays: 220),
-        DocType.vehiclePhoto: ok(DocType.vehiclePhoto),
-      },
-      plan: const DriverPlan(),
-      bank: const BankDetails(
-        bank: 'GTBank',
-        accountNumber: '0123456789',
-        accountName: 'TUNDE BAKARE',
-      ),
-      status: ApprovalStatus.approved,
-      submittedAt: now.subtract(const Duration(days: 240)),
-      joinedAt: now.subtract(const Duration(days: 238)),
-    );
+  void reset() {
+    _channel?.unsubscribe();
+    _channel = null;
+    state = const RegistrationState();
   }
-
-  void reset() => state = const RegistrationState();
 }
 
 final registrationProvider =

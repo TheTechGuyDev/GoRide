@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart' show Backend;
 
 import 'core/router.dart';
 import 'core/theme/admin_theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Backend.init();
   runApp(const ProviderScope(child: GoRideAdminApp()));
 }
 

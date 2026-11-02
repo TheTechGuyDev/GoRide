@@ -4,6 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:goride_core/goride_core.dart'
+    show
+        Backend,
+        PostgresChangeEvent,
+        PostgresChangeFilter,
+        PostgresChangeFilterType,
+        RealtimeChannel,
+        parseTime,
+        userIdProvider;
 
 import '../../features/account/account_settings.dart';
 import '../router/app_router.dart';
@@ -102,17 +111,76 @@ class NotificationsController extends Notifier<List<AppNotification>> {
   bool _initialised = false;
   int _nextId = 2000;
 
+  RealtimeChannel? _channel;
+
+  /// The inbox comes from Supabase (`notifications`); new rows from the
+  /// server (refunds, announcements, payouts) pop up as they arrive.
+  /// Trip updates are shown by the trip screen itself, so they are not
+  /// repeated as banners.
   @override
-  List<AppNotification> build() => [
-    AppNotification(
-      id: 1,
-      category: NotifyCategory.promos,
-      title: 'Welcome to GoRide',
-      body: 'Use GORIDE20 for 20% off your next ride.',
-      time: DateTime.now().subtract(const Duration(hours: 3)),
-      route: '/promos',
-    ),
-  ];
+  List<AppNotification> build() {
+    final uid = ref.watch(userIdProvider);
+    ref.onDispose(() => _channel?.unsubscribe());
+    if (uid == null) return const [];
+    Future.microtask(_load);
+    _channel = Backend.db
+        .channel('inbox-$uid')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: uid,
+          ),
+          callback: (p) {
+            final r = p.newRecord;
+            if (r['category'] == 'trips') {
+              _load();
+              return;
+            }
+            notify(
+              _category(r['category'] as String?),
+              r['title'] as String,
+              r['body'] as String,
+            );
+          },
+        )
+        .subscribe();
+    return const [];
+  }
+
+  Future<void> _load() async {
+    try {
+      final rows = await Backend.db
+          .from('notifications')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(50);
+      final server = [
+        for (final r in rows)
+          AppNotification(
+            id: (r['id'] as String).hashCode & 0x7fffffff,
+            category: _category(r['category'] as String?),
+            title: r['title'] as String,
+            body: r['body'] as String,
+            time: parseTime(r['created_at']) ?? DateTime.now(),
+            read: r['read'] as bool? ?? false,
+          ),
+      ];
+      final local = state.where((n) => n.id >= 1000 && n.id < 100000);
+      state = [...local, ...server]..sort((a, b) => b.time.compareTo(a.time));
+    } catch (_) {}
+  }
+
+  static NotifyCategory _category(String? c) => switch (c) {
+    'trips' => NotifyCategory.rideStatus,
+    'payments' || 'earnings' => NotifyCategory.wallet,
+    'safety' => NotifyCategory.safety,
+    'promos' => NotifyCategory.promos,
+    _ => NotifyCategory.updates,
+  };
 
   int get unread => state.where((n) => !n.read).length;
 
@@ -261,10 +329,32 @@ class NotificationsController extends Notifier<List<AppNotification>> {
     _ => 'Updates',
   };
 
-  void markAllRead() => state = [for (final n in state) n.markRead()];
+  void markAllRead() {
+    state = [for (final n in state) n.markRead()];
+    final uid = Backend.user?.id;
+    if (uid != null) {
+      Backend.db
+          .from('notifications')
+          .update({'read': true})
+          .eq('user_id', uid)
+          .eq('read', false)
+          .then((_) {}, onError: (_) {});
+    }
+  }
+
   void markRead(int id) =>
       state = [for (final n in state) n.id == id ? n.markRead() : n];
-  void clear() => state = [];
+  void clear() {
+    state = [];
+    final uid = Backend.user?.id;
+    if (uid != null) {
+      Backend.db
+          .from('notifications')
+          .delete()
+          .eq('user_id', uid)
+          .then((_) {}, onError: (_) {});
+    }
+  }
 }
 
 final notificationsProvider =

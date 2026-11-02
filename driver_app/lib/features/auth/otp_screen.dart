@@ -18,7 +18,7 @@ class OtpScreen extends ConsumerStatefulWidget {
 }
 
 class _OtpScreenState extends ConsumerState<OtpScreen> {
-  static const _length = 4;
+  static const _length = 6;
   static const _resendSeconds = 60;
 
   String _code = '';
@@ -60,20 +60,27 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   Future<void> _verify() async {
     setState(() => _verifying = true);
     final auth = ref.read(authControllerProvider.notifier);
-    final ok = await auth.verifyOtp(_code);
+    final error = await auth.verifyOtp(_code);
+    String? next;
+    String? enterError;
+    if (error == null) {
+      try {
+        next = await auth.enter();
+      } catch (e) {
+        enterError = AuthService.message(e);
+      }
+    }
     if (!mounted) return;
     setState(() => _verifying = false);
 
-    if (!ok) {
+    if (error != null || enterError != null) {
       setState(() {
-        _error = 'Invalid code, please try again';
+        _error = error ?? enterError;
         _code = '';
       });
       return;
     }
-
-    final flow = ref.read(authControllerProvider).flow;
-    context.go(flow == AuthFlow.signUp ? Routes.registration : Routes.home);
+    context.go(next ?? Routes.welcome);
   }
 
   /// Lets a physical keyboard type the code too (web preview / tablets).
@@ -100,7 +107,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final phone = ref.watch(authControllerProvider).phone;
+    final email = ref.watch(authControllerProvider).email;
 
     return Focus(
       focusNode: _focus,
@@ -117,7 +124,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   AuthHeader(
                     title: 'Enter OTP Code',
                     subtitle:
-                        'Check your messages! We\'ve sent a one-time code to ${PhoneUtils.pretty(phone)}. Enter the code below to verify your account and continue.',
+                        'We sent a 6-digit code to $email. Check your inbox (and spam folder), then enter it below.',
                   ),
                   const SizedBox(height: 32),
                   Row(
@@ -127,7 +134,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       return Expanded(
                         child: Container(
                           margin: EdgeInsets.only(
-                            right: i == _length - 1 ? 0 : 12,
+                            right: i == _length - 1 ? 0 : 8,
                           ),
                           height: 64,
                           alignment: Alignment.center,
@@ -203,13 +210,26 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       child: TextButton(
                         onPressed: _secondsLeft > 0
                             ? null
-                            : () {
-                                _startTimer();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('A new code has been sent'),
-                                  ),
-                                );
+                            : () async {
+                                final a = ref.read(authControllerProvider);
+                                final messenger = ScaffoldMessenger.of(context);
+                                try {
+                                  await ref
+                                      .read(authControllerProvider.notifier)
+                                      .requestOtp(email: a.email, flow: a.flow);
+                                  _startTimer();
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text('A new code has been sent'),
+                                    ),
+                                  );
+                                } catch (e) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(AuthService.message(e)),
+                                    ),
+                                  );
+                                }
                               },
                         child: Text(
                           'Resend code',

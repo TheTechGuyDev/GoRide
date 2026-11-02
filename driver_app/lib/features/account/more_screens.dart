@@ -623,6 +623,6 @@ Future<void> confirmLogout(BuildContext context, WidgetRef ref) async {
   ref.read(driverProvider.notifier).goOffline();
   ref.read(registrationProvider.notifier).reset();
   ref.read(earningsProvider.notifier).reset();
-  ref.read(authControllerProvider.notifier).signOut();
-  context.go(Routes.welcome);
+  await ref.read(authControllerProvider.notifier).signOut();
+  if (context.mounted) context.go(Routes.welcome);
 }

@@ -17,7 +17,7 @@ class PhoneScreen extends ConsumerStatefulWidget {
 }
 
 class _PhoneScreenState extends ConsumerState<PhoneScreen> {
-  final _phone = TextEditingController();
+  final _email = TextEditingController();
   bool _agreed = false;
   bool _loading = false;
   String? _error;
@@ -25,17 +25,27 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
   bool get _signUp => widget.flow == AuthFlow.signUp;
 
   bool get _canSubmit =>
-      PhoneUtils.isValid(_phone.text) && (_agreed || !_signUp);
+      EmailField.isValid(_email.text) && (_agreed || !_signUp);
 
   Future<void> _submit() async {
-    if (!PhoneUtils.isValid(_phone.text)) {
-      setState(() => _error = 'Enter a valid Nigerian phone number');
+    if (!EmailField.isValid(_email.text)) {
+      setState(() => _error = 'Enter a valid email address');
       return;
     }
     setState(() => _loading = true);
-    await ref
-        .read(authControllerProvider.notifier)
-        .requestOtp(phone: PhoneUtils.toE164(_phone.text), flow: widget.flow);
+    try {
+      await ref
+          .read(authControllerProvider.notifier)
+          .requestOtp(email: _email.text, flow: widget.flow);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = AuthService.message(e);
+        });
+      }
+      return;
+    }
     if (!mounted) return;
     setState(() => _loading = false);
     context.push(Routes.otp);
@@ -43,7 +53,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
 
   @override
   void dispose() {
-    _phone.dispose();
+    _email.dispose();
     super.dispose();
   }
 
@@ -57,13 +67,13 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
           AuthHeader(
             title: _signUp ? 'Start driving with GoRide' : 'Welcome back',
             subtitle: _signUp
-                ? 'Enter your phone number. We\'ll send a code to confirm it\'s you, then help you register your vehicle.'
-                : 'Enter the phone number on your driver account.',
+                ? 'Enter your email. We\'ll send a 6-digit code to confirm it\'s you, then help you register your vehicle.'
+                : 'Enter the email on your driver account and we\'ll send you a code.',
           ),
           const SizedBox(height: 32),
-          const FieldLabel('Phone Number'),
-          PhoneField(
-            controller: _phone,
+          const FieldLabel('Email'),
+          EmailField(
+            controller: _email,
             errorText: _error,
             onChanged: (_) => setState(() => _error = null),
           ),
@@ -126,6 +136,24 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 28),
+          const OrDivider(),
+          const SizedBox(height: 28),
+          SocialButton(
+            provider: SocialProvider.google,
+            onPressed: () async {
+              try {
+                await ref
+                    .read(authControllerProvider.notifier)
+                    .signInWithGoogle();
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(AuthService.message(e))),
+                );
+              }
+            },
+          ),
           if (!_signUp) ...[
             const SizedBox(height: 24),
             Container(
@@ -135,7 +163,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Preview: signing in opens an approved demo driver account so you can try going online straight away.',
+                'Preview: after you submit your application, tap Approve on the status screen to try driving straight away.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.4,

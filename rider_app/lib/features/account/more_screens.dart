@@ -685,6 +685,7 @@ Future<void> confirmLogout(BuildContext context, WidgetRef ref) async {
   );
   if (ok != true || !context.mounted) return;
   ref.read(tripControllerProvider.notifier).clear();
+  await ref.read(authControllerProvider.notifier).signOut();
   ref.invalidate(authControllerProvider);
-  context.go(Routes.welcome);
+  if (context.mounted) context.go(Routes.welcome);
 }

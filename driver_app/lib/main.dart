@@ -8,8 +8,9 @@ import 'core/notifications/notification_service.dart';
 import 'core/router/app_router.dart';
 import 'features/home/request_card.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Backend.init();
   runApp(const ProviderScope(child: GoRideDriverApp()));
 }
 

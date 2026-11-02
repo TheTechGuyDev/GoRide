@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router/routes.dart';
+import '../auth/auth_controller.dart';
 import '../../core/theme/app_colors.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _fade = AnimationController(
     vsync: this,
@@ -22,9 +24,25 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 2200), () {
-      if (mounted) context.go(Routes.walkthrough);
-    });
+    _route();
+  }
+
+  /// Signed in (including coming back from Google) goes straight in.
+  Future<void> _route() async {
+    final wait = Future.delayed(const Duration(milliseconds: 1600));
+    var next = Routes.walkthrough;
+    try {
+      final auth = ref.read(authControllerProvider.notifier);
+      if (await auth.loadProfile()) {
+        next = ref.read(authControllerProvider).profile.complete
+            ? Routes.home
+            : Routes.personalInfo;
+      }
+    } catch (_) {
+      // Offline or session expired: show the normal start screens.
+    }
+    await wait;
+    if (mounted) context.go(next);
   }
 
   @override

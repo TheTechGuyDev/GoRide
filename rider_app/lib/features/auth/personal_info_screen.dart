@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:goride_core/goride_core.dart' show AuthService;
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/router/routes.dart';
@@ -24,8 +25,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
 
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _email = TextEditingController();
+  late final TextEditingController _email;
   late final TextEditingController _phone;
+  late final bool _phoneLocked;
+  String? _phoneError;
   String? _gender;
   DateTime? _dob;
   Uint8List? _photo;
@@ -34,7 +37,13 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
   @override
   void initState() {
     super.initState();
-    final phone = ref.read(authControllerProvider).profile.phone;
+    final p = ref.read(authControllerProvider).profile;
+    final phone = p.phone;
+    _phoneLocked = phone.isNotEmpty;
+    _email = TextEditingController(text: p.email);
+    _name.text = p.fullName;
+    _gender = p.gender;
+    _dob = p.dateOfBirth;
     _phone = TextEditingController(
       text: phone.startsWith(PhoneUtils.dialCode) ? phone.substring(4) : phone,
     );
@@ -91,6 +100,10 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!PhoneUtils.isValid(_phone.text)) {
+      setState(() => _phoneError = 'Enter a valid Nigerian phone number');
+      return;
+    }
     if (_gender == null || _dob == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -102,15 +115,24 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
     setState(() => _saving = true);
     final auth = ref.read(authControllerProvider.notifier);
     final current = ref.read(authControllerProvider).profile;
-    await auth.saveProfile(
-      current.copyWith(
-        fullName: _name.text.trim(),
-        email: _email.text.trim(),
-        gender: _gender,
-        dateOfBirth: _dob,
-        photo: _photo,
-      ),
-    );
+    try {
+      await auth.saveProfile(
+        current.copyWith(
+          fullName: _name.text.trim(),
+          phone: PhoneUtils.toE164(_phone.text),
+          gender: _gender,
+          dateOfBirth: _dob,
+          photo: _photo,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AuthService.message(e))),
+      );
+      return;
+    }
     if (!mounted) return;
     context.go(Routes.home);
   }
@@ -149,6 +171,7 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
             const FieldLabel('Email'),
             TextFormField(
               controller: _email,
+              readOnly: true,
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 hintText: 'Email',
@@ -162,7 +185,12 @@ class _PersonalInfoScreenState extends ConsumerState<PersonalInfoScreen> {
             ),
             const SizedBox(height: 20),
             const FieldLabel('Phone Number'),
-            PhoneField(controller: _phone, readOnly: true),
+            PhoneField(
+              controller: _phone,
+              readOnly: _phoneLocked,
+              errorText: _phoneError,
+              onChanged: (_) => setState(() => _phoneError = null),
+            ),
             const SizedBox(height: 20),
             const FieldLabel('Gender'),
             DropdownButtonFormField<String>(

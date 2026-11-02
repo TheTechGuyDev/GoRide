@@ -106,6 +106,43 @@ class PhoneField extends StatelessWidget {
   }
 }
 
+/// Email input used on the sign-in screens.
+class EmailField extends StatelessWidget {
+  const EmailField({
+    super.key,
+    required this.controller,
+    this.onChanged,
+    this.readOnly = false,
+    this.errorText,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String>? onChanged;
+  final bool readOnly;
+  final String? errorText;
+
+  static bool isValid(String v) =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$').hasMatch(v.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      readOnly: readOnly,
+      keyboardType: TextInputType.emailAddress,
+      autofillHints: const [AutofillHints.email],
+      autocorrect: false,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+      decoration: InputDecoration(
+        hintText: 'you@example.com',
+        errorText: errorText,
+        prefixIcon: const Icon(Icons.mail_outline),
+      ),
+    );
+  }
+}
+
 /// Drawn flag so it renders the same on every platform (no emoji font needed).
 class _NigeriaFlag extends StatelessWidget {
   const _NigeriaFlag();
@@ -151,9 +188,10 @@ class OrDivider extends StatelessWidget {
 enum SocialProvider { google, apple }
 
 class SocialButton extends StatelessWidget {
-  const SocialButton({super.key, required this.provider});
+  const SocialButton({super.key, required this.provider, this.onPressed});
 
   final SocialProvider provider;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -176,13 +214,11 @@ class SocialButton extends StatelessWidget {
       height: 58,
       width: double.infinity,
       child: OutlinedButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Social sign-in will be enabled with Supabase'),
+        onPressed:
+            onPressed ??
+            () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Coming soon')),
             ),
-          );
-        },
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: AppColors.border),
           shape: const StadiumBorder(),

@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:goride_core/goride_core.dart' show AuthService;
 
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/phone_utils.dart';
 import 'auth_controller.dart';
 import 'widgets/auth_widgets.dart';
 
@@ -19,7 +19,7 @@ class OtpScreen extends ConsumerStatefulWidget {
 }
 
 class _OtpScreenState extends ConsumerState<OtpScreen> {
-  static const _length = 4;
+  static const _length = 6;
   static const _resendSeconds = 60;
 
   String _code = '';
@@ -61,20 +61,20 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   Future<void> _verify() async {
     setState(() => _verifying = true);
     final auth = ref.read(authControllerProvider.notifier);
-    final ok = await auth.verifyOtp(_code);
+    final error = await auth.verifyOtp(_code);
     if (!mounted) return;
     setState(() => _verifying = false);
 
-    if (!ok) {
+    if (error != null) {
       setState(() {
-        _error = 'Invalid code, please try again';
+        _error = error;
         _code = '';
       });
       return;
     }
 
-    final flow = ref.read(authControllerProvider).flow;
-    if (flow == AuthFlow.signUp) {
+    final profile = ref.read(authControllerProvider).profile;
+    if (!profile.complete) {
       context.pushReplacement(Routes.personalInfo);
     } else {
       auth.completeSignIn();
@@ -106,7 +106,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final phone = ref.watch(authControllerProvider).profile.phone;
+    final email = ref.watch(authControllerProvider).profile.email;
 
     return Focus(
       focusNode: _focus,
@@ -121,10 +121,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                 children: [
                   AuthHeader(
-                    title: 'Enter OTP Code',
-                    emoji: '🔐',
+                    title: 'Enter your code',
                     subtitle:
-                        'Check your messages! We\'ve sent a one-time code to ${PhoneUtils.pretty(phone)}. Enter the code below to verify your account and continue.',
+                        'We sent a 6-digit code to $email. Check your inbox (and spam folder), then enter it below.',
                   ),
                   const SizedBox(height: 32),
                   Row(
@@ -134,9 +133,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       return Expanded(
                         child: Container(
                           margin: EdgeInsets.only(
-                            right: i == _length - 1 ? 0 : 12,
+                            right: i == _length - 1 ? 0 : 8,
                           ),
-                          height: 64,
+                          height: 56,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: active
@@ -210,13 +209,30 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       child: TextButton(
                         onPressed: _secondsLeft > 0
                             ? null
-                            : () {
-                                _startTimer();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('A new code has been sent'),
-                                  ),
-                                );
+                            : () async {
+                                final a = ref.read(authControllerProvider);
+                                final messenger = ScaffoldMessenger.of(context);
+                                try {
+                                  await ref
+                                      .read(authControllerProvider.notifier)
+                                      .requestOtp(
+                                        email: a.profile.email,
+                                        flow: a.flow,
+                                        rememberMe: a.rememberMe,
+                                      );
+                                  _startTimer();
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text('A new code has been sent'),
+                                    ),
+                                  );
+                                } catch (e) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(AuthService.message(e)),
+                                    ),
+                                  );
+                                }
                               },
                         child: Text(
                           'Resend code',

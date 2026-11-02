@@ -23,3 +23,21 @@ export 'src/widgets/form_widgets.dart';
 export 'src/widgets/settings_widgets.dart';
 export 'src/widgets/appearance_screen.dart';
 export 'src/models/lagos_places.dart';
+
+export 'src/backend/backend.dart';
+export 'package:supabase_flutter/supabase_flutter.dart'
+    show
+        Supabase,
+        SupabaseClient,
+        AuthException,
+        AuthChangeEvent,
+        OAuthProvider,
+        OtpType,
+        PostgrestException,
+        RealtimeChannel,
+        PostgresChangeEvent,
+        PostgresChangeFilter,
+        PostgresChangeFilterType,
+        Session,
+        FileOptions,
+        User;

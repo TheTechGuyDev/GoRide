@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:goride_core/goride_core.dart';
 
 import '../../core/router/routes.dart';
+import '../auth/auth_controller.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _fade = AnimationController(
     vsync: this,
@@ -22,9 +24,20 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 2000), () {
-      if (mounted) context.go(Routes.welcome);
-    });
+    _route();
+  }
+
+  /// A saved session (including coming back from Google) goes straight in.
+  Future<void> _route() async {
+    final wait = Future.delayed(const Duration(milliseconds: 1500));
+    String? next;
+    try {
+      next = await ref.read(authControllerProvider.notifier).enter();
+    } catch (_) {
+      // Offline or session expired: show the welcome screen.
+    }
+    await wait;
+    if (mounted) context.go(next ?? Routes.welcome);
   }
 
   @override

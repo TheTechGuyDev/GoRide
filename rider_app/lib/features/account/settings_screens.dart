@@ -141,6 +141,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const FieldLabel('Email'),
             TextFormField(
               controller: _email,
+              readOnly: true,
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.mail_outline, size: 20),

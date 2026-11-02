@@ -67,8 +67,9 @@ class AuthService {
       type: OtpType.email,
     );
     final user = res.user;
-    if (user == null)
+    if (user == null) {
       throw const AuthException('That code did not work. Try again.');
+    }
     return user;
   }
 

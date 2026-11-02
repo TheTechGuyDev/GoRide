@@ -302,6 +302,26 @@ class RegistrationController extends Notifier<RegistrationState> {
     final docs = results[2] as List;
     state = _fromRows(p, d, docs);
     _watch(uid);
+    // The photo is stored in Supabase Storage; fetch it so it shows everywhere.
+    if (p['avatar_url'] != null) {
+      try {
+        final bytes = await Backend.db.storage
+            .from('avatars')
+            .download('$uid/avatar.jpg');
+        final x = state.personal;
+        state = state.copyWith(
+          personal: PersonalDetails(
+            fullName: x.fullName,
+            email: x.email,
+            city: x.city,
+            gender: x.gender,
+            dateOfBirth: x.dateOfBirth,
+            photo: bytes,
+            referralCode: x.referralCode,
+          ),
+        );
+      } catch (_) {}
+    }
   }
 
   RegistrationState _fromRows(

@@ -133,10 +133,20 @@ class AuthController extends Notifier<AuthState> {
         .select()
         .eq('id', user.id)
         .maybeSingle();
-    final profile = row == null
+    var profile = row == null
         ? RiderProfile(email: user.email ?? '')
         : RiderProfile.fromRow(row).copyWith(email: user.email);
     state = state.copyWith(profile: profile, isSignedIn: profile.complete);
+    // The photo is stored in Supabase Storage; fetch it so it shows everywhere.
+    if (profile.avatarUrl != null && profile.photo == null) {
+      try {
+        final bytes = await Backend.db.storage
+            .from('avatars')
+            .download('${user.id}/avatar.jpg');
+        profile = profile.copyWith(photo: bytes);
+        state = state.copyWith(profile: profile);
+      } catch (_) {}
+    }
     return true;
   }
 

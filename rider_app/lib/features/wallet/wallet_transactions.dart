@@ -86,7 +86,6 @@ class WalletTransactionsController extends Notifier<List<WalletTx>> {
           .order('created_at', ascending: false)
           .limit(200);
       state = [for (final r in rows) _fromRow(r)];
-      ref.invalidate(walletBalanceSyncProvider);
     } catch (_) {}
   }
 

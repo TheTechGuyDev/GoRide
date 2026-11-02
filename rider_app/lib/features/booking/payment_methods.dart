@@ -1,6 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:goride_core/goride_core.dart' show Backend, userIdProvider;
+import 'package:goride_core/goride_core.dart'
+    show
+        Backend,
+        PostgresChangeEvent,
+        PostgresChangeFilter,
+        PostgresChangeFilterType,
+        RealtimeChannel,
+        userIdProvider;
 
 import '../../core/notifications/notification_service.dart';
 import '../../core/router/routes.dart';
@@ -40,12 +49,50 @@ class PaymentMethod {
 /// Wallet balance in Naira, from the server (sum of wallet transactions).
 /// Money only moves on the server: trips, tips, refunds and Paystack top-ups.
 class WalletController extends Notifier<int> {
+  RealtimeChannel? _channel;
+  Timer? _timer;
+
   @override
   int build() {
     final uid = ref.watch(userIdProvider);
     ref.watch(walletBalanceSyncProvider);
+    ref.onDispose(() {
+      _channel?.unsubscribe();
+      _timer?.cancel();
+    });
     if (uid == null) return 0;
     Future.microtask(refresh);
+    // Money added by GoRide (refunds, credits, top-ups) shows straight away.
+    _channel = Backend.db
+        .channel('balance-$uid-${DateTime.now().millisecondsSinceEpoch}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'wallet_transactions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: uid,
+          ),
+          callback: (p) {
+            refresh();
+            ref.read(walletTransactionsProvider.notifier).refresh();
+            final amount = (p.newRecord['amount'] as num?)?.toInt() ?? 0;
+            if (amount > 0 && p.newRecord['kind'] != 'trip_earning') {
+              ref
+                  .read(notificationsProvider.notifier)
+                  .notify(
+                    NotifyCategory.wallet,
+                    '${naira(amount)} added to your wallet',
+                    (p.newRecord['title'] as String?) ?? 'Wallet credit',
+                    route: Routes.wallet,
+                  );
+            }
+          },
+        )
+        .subscribe();
+    // Backup in case a live update is missed.
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => refresh());
     return stateOrNull ?? 0;
   }
 

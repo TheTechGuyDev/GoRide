@@ -48,7 +48,9 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     }
 
     if (_type == PlanType.commission) {
-      reg.savePlan(const DriverPlan());
+      reg.savePlan(
+        DriverPlan(commissionFreeUntil: current.commissionFreeUntil),
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You are now on the commission plan')),
       );
@@ -95,6 +97,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
         type: PlanType.subscription,
         period: _period,
         paidUntil: start.add(_period.length),
+        commissionFreeUntil: current.commissionFreeUntil,
       ),
     );
     if (!mounted) return;
@@ -114,8 +117,8 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
     final active = current?.subscriptionActive ?? false;
     final lockedToSub = widget.manage && active;
 
-    // Weekly example to compare the plans.
-    const weeklyFares = 60000;
+    // Weekly example for a busy full-time driver.
+    final weeklyFares = _kind == VehicleKind.car ? 180000 : 90000;
     final keepCommission =
         weeklyFares - (weeklyFares * PlanPricing.commissionRate).round();
     final weeklySub = PlanPricing.subscriptionPrice(
@@ -194,6 +197,7 @@ class _PlanScreenState extends ConsumerState<PlanScreen> {
             price: '${(PlanPricing.commissionRate * 100).round()}% per trip',
             points: const [
               'Nothing to pay upfront',
+              'Founding drivers: 0% for the first 30 days',
               'Best if you drive part-time',
               'On cash trips, commission is taken from your wallet',
             ],

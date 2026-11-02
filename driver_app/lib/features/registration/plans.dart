@@ -29,13 +29,16 @@ extension SubscriptionPeriodX on SubscriptionPeriod {
 /// change them from the admin dashboard without an app update.
 class PlanPricing {
   /// GoRide's cut of each fare on the commission plan.
-  static const commissionRate = 0.15;
+  static const commissionRate = 0.10;
+
+  /// Founding drivers pay no commission for their first month.
+  static const foundingFreeDays = 30;
 
   static int subscriptionPrice(VehicleKind kind, SubscriptionPeriod period) {
     final (daily, weekly, monthly) = switch (kind) {
-      VehicleKind.bike => (700, 4000, 14000),
-      VehicleKind.keke => (800, 4500, 16000),
-      VehicleKind.car => (2000, 11000, 38000),
+      VehicleKind.bike => (1300, 6500, 24000),
+      VehicleKind.keke => (1300, 6500, 24000),
+      VehicleKind.car => (3000, 15000, 55000),
     };
     return switch (period) {
       SubscriptionPeriod.daily => daily,
@@ -50,6 +53,7 @@ class DriverPlan {
     this.type = PlanType.commission,
     this.period = SubscriptionPeriod.weekly,
     this.paidUntil,
+    this.commissionFreeUntil,
   });
 
   final PlanType type;
@@ -58,6 +62,13 @@ class DriverPlan {
   /// Subscription only: when the current paid period ends.
   final DateTime? paidUntil;
 
+  /// Founding drivers: no commission until this date.
+  final DateTime? commissionFreeUntil;
+
+  bool get foundingFree =>
+      commissionFreeUntil != null &&
+      commissionFreeUntil!.isAfter(DateTime.now());
+
   bool get isSubscription => type == PlanType.subscription;
 
   bool get subscriptionActive =>
@@ -65,22 +76,28 @@ class DriverPlan {
 
   /// GoRide's share of a fare under this plan.
   int commissionOn(int fare) =>
-      isSubscription ? 0 : (fare * PlanPricing.commissionRate).round();
+      isSubscription || foundingFree
+      ? 0
+      : (fare * PlanPricing.commissionRate).round();
 
   String get title => isSubscription
       ? '${period.label} subscription'
+      : foundingFree
+      ? 'Founding driver: 0% commission until ${formatDate(commissionFreeUntil!)}'
       : 'Commission (${(PlanPricing.commissionRate * 100).round()}% per trip)';
 
   DriverPlan copyWith({
     PlanType? type,
     SubscriptionPeriod? period,
     DateTime? paidUntil,
+    DateTime? commissionFreeUntil,
     bool clearPaidUntil = false,
   }) {
     return DriverPlan(
       type: type ?? this.type,
       period: period ?? this.period,
       paidUntil: clearPaidUntil ? null : paidUntil ?? this.paidUntil,
+      commissionFreeUntil: commissionFreeUntil ?? this.commissionFreeUntil,
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:goride_core/goride_core.dart';
 
 import '../../core/router/routes.dart';
 import '../earnings/earnings_controller.dart';
+import '../registration/plans.dart';
 import '../registration/registration_controller.dart';
 import 'trip_controller.dart';
 import 'trip_screen.dart' show callRider;
@@ -427,9 +428,13 @@ class _TripCompleteScreenState extends ConsumerState<TripCompleteScreen> {
                     _Line('Waiting fee', naira(t.waitingFee)),
                   if (r.surge > 1) _Line('Busy area', '${r.surge}x included'),
                   _Line(
-                    commission > 0 ? 'GoRide commission (15%)' : 'Commission',
+                    commission > 0
+                        ? 'GoRide commission (${(PlanPricing.commissionRate * 100).round()}%)'
+                        : 'Commission',
                     commission > 0
                         ? '-${naira(commission)}'
+                        : plan?.foundingFree == true
+                        ? 'None (founding month)'
                         : 'None (subscription)',
                   ),
                   const Divider(height: 24),

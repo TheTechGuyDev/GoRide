@@ -66,7 +66,7 @@ const _faqs = [
   _Faq(
     'Money',
     'Commission or subscription: which is better?',
-    'Commission (15%) suits part-time drivers: you pay nothing upfront. A subscription suits full-time drivers: you pay a flat fee and keep 100% of fares. You can switch in My plan.',
+    'Commission (10%) suits part-time drivers: you pay nothing upfront. A subscription suits full-time drivers: you pay a flat fee and keep 100% of fares. You can switch in My plan.',
   ),
   _Faq(
     'Money',
@@ -400,7 +400,7 @@ const _termsSections = [
   ),
   (
     '2. Fees',
-    'On the commission plan GoRide keeps 15% of each fare. On a subscription you pay a fixed fee per period and keep all fares. Prices can change with 7 days\' notice.',
+    'Founding drivers pay 0% commission for their first 30 days. After that, on the commission plan GoRide keeps 10% of each fare. On a subscription you pay a fixed fee per period and keep all fares. Prices can change with 7 days\' notice.',
   ),
   (
     '3. Cash trips',

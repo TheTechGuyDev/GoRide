@@ -657,7 +657,7 @@ class DriverDetailPage extends ConsumerWidget {
                             : d.paidUntil!.isAfter(DateTime.now())
                             ? ' (paid to ${formatDate(d.paidUntil!)})'
                             : ' (expired)'}'
-                      : 'Commission 15%',
+                      : 'Commission ${ref.watch(storeProvider).settings.commissionRate}%',
                 ),
                 _KV('Applied', formatDate(d.appliedAt)),
                 if (d.joinedAt != null)

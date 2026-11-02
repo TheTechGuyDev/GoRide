@@ -154,7 +154,7 @@ class DemandZone {
 }
 
 const demandZones = [
-  DemandZone(LatLng(6.4300, 3.4250), 900, 1.4, 'Victoria Island'),
+  DemandZone(LatLng(6.4300, 3.4250), 900, 1.3, 'Victoria Island'),
   DemandZone(LatLng(6.4390, 3.4560), 1100, 1.2, 'Lekki Phase 1'),
   DemandZone(LatLng(6.4510, 3.3950), 800, 1.3, 'Lagos Island'),
   DemandZone(LatLng(6.6080, 3.3550), 1200, 1.2, 'Ikeja'),
@@ -450,7 +450,9 @@ class DriverController extends Notifier<DriverState> {
   double _surgeAt(LatLng p) {
     const dist = Distance();
     for (final z in demandZones) {
-      if (dist(p, z.centre) <= z.radiusM) return z.multiplier;
+      if (dist(p, z.centre) <= z.radiusM) {
+        return z.multiplier > maxSurge ? maxSurge : z.multiplier;
+      }
     }
     return 1.0;
   }

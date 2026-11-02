@@ -5,7 +5,11 @@ import '../utils/money.dart';
 
 enum VehicleKind { bike, keke, car }
 
-/// A GoRide product with its Lagos pricing.
+/// Highest busy-area (surge) multiplier any fare can have.
+const maxSurge = 1.3;
+
+/// A GoRide product with its pricing.
+/// Fare = base + per km + per minute, never below the minimum fare.
 /// Later these rates come from a `ride_types` table so you can change prices
 /// from the admin dashboard without an app update.
 class RideType {
@@ -81,9 +85,9 @@ const rideTypes = [
     kind: VehicleKind.bike,
     passengers: 1,
     baseFare: 300,
-    perKm: 120,
-    perMinute: 15,
-    minimumFare: 700,
+    perKm: 150,
+    perMinute: 10,
+    minimumFare: 800,
     etaMinutes: (2, 4),
     description: 'Fastest through traffic. Helmet provided.',
   ),
@@ -92,10 +96,10 @@ const rideTypes = [
     name: 'GoRide Keke',
     kind: VehicleKind.keke,
     passengers: 3,
-    baseFare: 400,
-    perKm: 150,
-    perMinute: 20,
-    minimumFare: 900,
+    baseFare: 350,
+    perKm: 170,
+    perMinute: 10,
+    minimumFare: 800,
     etaMinutes: (3, 5),
     description: 'Affordable rides for short trips.',
   ),
@@ -104,10 +108,10 @@ const rideTypes = [
     name: 'GoRide Car',
     kind: VehicleKind.car,
     passengers: 4,
-    baseFare: 700,
-    perKm: 250,
-    perMinute: 40,
-    minimumFare: 1500,
+    baseFare: 800,
+    perKm: 300,
+    perMinute: 20,
+    minimumFare: 2000,
     etaMinutes: (3, 6),
     description: 'Everyday rides in a clean, comfortable car.',
   ),
@@ -116,10 +120,10 @@ const rideTypes = [
     name: 'GoRide Comfort',
     kind: VehicleKind.car,
     passengers: 4,
-    baseFare: 900,
-    perKm: 320,
-    perMinute: 50,
-    minimumFare: 2000,
+    baseFare: 1000,
+    perKm: 350,
+    perMinute: 25,
+    minimumFare: 2500,
     etaMinutes: (4, 7),
     description: 'Newer cars with AC and top-rated drivers.',
   ),
@@ -128,10 +132,10 @@ const rideTypes = [
     name: 'GoRide XL',
     kind: VehicleKind.car,
     passengers: 6,
-    baseFare: 1200,
-    perKm: 400,
-    perMinute: 60,
-    minimumFare: 2800,
+    baseFare: 1300,
+    perKm: 420,
+    perMinute: 30,
+    minimumFare: 3200,
     etaMinutes: (5, 9),
     description: 'SUVs and minivans for groups and luggage.',
   ),

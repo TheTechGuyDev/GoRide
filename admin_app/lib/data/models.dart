@@ -750,7 +750,7 @@ class AlertChannel {
 
 class AppSettings {
   const AppSettings({
-    this.commissionRate = 15,
+    this.commissionRate = 10,
     this.debtLimit = 5000,
     this.waitingFeePerMin = 30,
     this.freeWaitMinutes = 3,
@@ -759,7 +759,7 @@ class AppSettings {
     this.offRouteMetres = 300,
     this.routeAlertTimeoutSeconds = 60,
     this.surgeEnabled = true,
-    this.maxSurge = 1.5,
+    this.maxSurge = 1.3,
     this.paystackPublicKey = '',
     this.paystackSecretSet = false,
     this.paystackLive = false,

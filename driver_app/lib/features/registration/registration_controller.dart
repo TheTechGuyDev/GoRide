@@ -307,6 +307,12 @@ class RegistrationController extends Notifier<RegistrationState> {
     state = state.copyWith(
       status: ApprovalStatus.approved,
       joinedAt: DateTime.now(),
+      // New drivers join as founding drivers: 0% commission for 30 days.
+      plan: state.plan?.copyWith(
+        commissionFreeUntil: DateTime.now().add(
+          const Duration(days: PlanPricing.foundingFreeDays),
+        ),
+      ),
       documents: {
         for (final e in state.documents.entries)
           e.key: e.value.copyWith(status: DocStatus.approved),

@@ -819,7 +819,7 @@ class AdminStore extends Notifier<AdminData> {
             dropoff: to.name,
             rideTypeId: drv.rideTypeId,
             fare: done ? fare : 0,
-            commission: done && !drv.subscription ? (fare * 0.15).round() : 0,
+            commission: done && !drv.subscription ? (fare * 0.10).round() : 0,
             payment: pick(['cash', 'cash', 'wallet', 'card']),
             status: status,
             date: at,
@@ -842,9 +842,9 @@ class AdminStore extends Notifier<AdminData> {
             ? d.rideTypeId
             : 'car';
         final amt = switch (kind) {
-          'bike' => weekly ? 4000 : 700,
-          'keke' => weekly ? 4500 : 800,
-          _ => weekly ? 11000 : 2000,
+          'bike' => weekly ? 6500 : 1300,
+          'keke' => weekly ? 6500 : 1300,
+          _ => weekly ? 15000 : 3000,
         };
         subs.add(
           SubscriptionPayment(
@@ -1337,9 +1337,9 @@ class AdminStore extends Notifier<AdminData> {
     ];
 
     const planPrices = [
-      PlanPrice('Bike', 700, 4000, 14000),
-      PlanPrice('Keke', 800, 4500, 16000),
-      PlanPrice('Car', 2000, 11000, 38000),
+      PlanPrice('Bike', 1300, 6500, 24000),
+      PlanPrice('Keke', 1300, 6500, 24000),
+      PlanPrice('Car', 3000, 15000, 55000),
     ];
 
     return AdminData(

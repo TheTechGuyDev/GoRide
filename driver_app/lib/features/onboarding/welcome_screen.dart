@@ -51,8 +51,8 @@ class WelcomeScreen extends StatelessWidget {
                   const SizedBox(height: 28),
                   const _Benefit(
                     icon: Icons.percent,
-                    title: 'Only 15% commission',
-                    body: 'Or pay a flat subscription and keep 100% of every fare.',
+                    title: '0% for your first month, then 10%',
+                    body: 'Half what other apps charge. Or pay a flat weekly fee and keep 100% of every fare.',
                   ),
                   const _Benefit(
                     icon: Icons.bolt,

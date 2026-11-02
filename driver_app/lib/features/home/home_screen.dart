@@ -674,12 +674,20 @@ class _BottomPanel extends StatelessWidget {
             ),
           ),
           if (online)
-            TextButton(
-              onPressed: searching ? null : onRequestNow,
-              child: Text(
-                'Preview: send me a request now',
-                style: TextStyle(fontSize: 12, color: AppColors.textHint),
-              ),
+            Consumer(
+              builder: (context, ref, _) {
+                final demo = ref.watch(demoDriveProvider);
+                return TextButton(
+                  onPressed: () =>
+                      ref.read(demoDriveProvider.notifier).set(!demo),
+                  child: Text(
+                    demo
+                        ? 'Demo drive is ON (car drives itself). Tap for real GPS'
+                        : 'Testing alone? Tap for demo drive',
+                    style: TextStyle(fontSize: 12, color: AppColors.textHint),
+                  ),
+                );
+              },
             ),
         ],
       ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:goride_core/goride_core.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -160,6 +161,18 @@ const demandZones = [
   DemandZone(LatLng(6.5170, 3.3850), 900, 1.1, 'Yaba'),
 ];
 
+/// Preview helper: the car drives itself along the route (for testing with
+/// one device). Off = real GPS, which is how drivers use the app.
+class DemoDriveController extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void set(bool on) => state = on;
+}
+
+final demoDriveProvider = NotifierProvider<DemoDriveController, bool>(
+  DemoDriveController.new,
+);
+
 class DriverController extends Notifier<DriverState> {
   static const requestSeconds = 15;
 
@@ -170,6 +183,7 @@ class DriverController extends Notifier<DriverState> {
   Timer? _countdown;
   Timer? _publish;
   Timer? _poll;
+  StreamSubscription<Position>? _gps;
   RealtimeChannel? _requests;
   AudioPlayer? _player;
   bool _paused = false;
@@ -182,6 +196,7 @@ class DriverController extends Notifier<DriverState> {
       _countdown?.cancel();
       _publish?.cancel();
       _poll?.cancel();
+      _gps?.cancel();
       _requests?.unsubscribe();
       _player?.dispose();
     });
@@ -229,6 +244,7 @@ class DriverController extends Notifier<DriverState> {
     syncLocation();
     state = state.copyWith(online: true, onlineSince: DateTime.now());
     _paused = false;
+    _startGps();
     await _sendLocation(force: true, online: true);
     _publish?.cancel();
     _publish = Timer.periodic(
@@ -238,7 +254,30 @@ class DriverController extends Notifier<DriverState> {
     _listen();
   }
 
+  /// Follows the phone's real GPS while online.
+  void _startGps() {
+    _gps?.cancel();
+    try {
+      _gps =
+          Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 5,
+            ),
+          ).listen((p) {
+            // In demo drive the trip moves the car instead.
+            if (ref.read(demoDriveProvider) && _paused) return;
+            setPosition(
+              LatLng(p.latitude, p.longitude),
+              heading: p.heading > 0 ? p.heading : state.heading,
+            );
+          }, onError: (_) {});
+    } catch (_) {}
+  }
+
   Future<void> goOffline() async {
+    _gps?.cancel();
+    _gps = null;
     _countdown?.cancel();
     _publish?.cancel();
     _poll?.cancel();

@@ -270,7 +270,59 @@ class TripController extends Notifier<ActiveTrip?> {
   /// Seconds the simulation takes for a leg (kept short for the preview).
   double _legSeconds(RouteInfo r) => (r.minutes * 2.0).clamp(14, 32).toDouble();
 
+  /// Real trips follow the phone's GPS; demo drive moves the car by itself.
   void _drive() {
+    if (ref.read(demoDriveProvider)) return _demoDrive();
+    _timer?.cancel();
+    final startLeg = state;
+    if (startLeg == null) return;
+    const dist = Distance();
+    LatLng target(ActiveTrip t) => t.stage == TripStage.toPickup
+        ? t.request.pickup.position
+        : t.request.destination.position;
+    final legStart = startLeg.position;
+    final legMetres = max(200.0, dist(legStart, target(startLeg)));
+    var warned = false;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final t = state;
+      if (t == null) return;
+      if (t.stage != TripStage.toPickup && t.stage != TripStage.onTrip) return;
+      final pos = ref.read(driverProvider).position;
+      final left = dist(pos, target(t));
+      // Close enough counts as arrived (GPS is never perfect).
+      final arrived = left <= (t.stage == TripStage.toPickup ? 200 : 300);
+      final progress = arrived ? 1.0 : (1 - left / legMetres).clamp(0.0, 0.84);
+      state = t.copyWith(
+        progress: progress,
+        position: pos,
+        heading: ref.read(driverProvider).heading,
+      );
+      if (arrived && !warned) {
+        warned = true;
+        if (t.stage == TripStage.toPickup) {
+          _notes.notify(
+            NotifyCategory.trips,
+            'You\'ve reached the pickup',
+            'Tap "I\'ve arrived" to let ${t.request.riderFirstName} know.',
+            route: '/trip',
+            id: NotifyIds.trip,
+          );
+        } else {
+          _timer?.cancel();
+          state = state!.copyWith(stage: TripStage.atDestination);
+          _notes.notify(
+            NotifyCategory.trips,
+            'Destination reached',
+            'End the trip to see the fare.',
+            route: '/trip',
+            id: NotifyIds.trip,
+          );
+        }
+      }
+    });
+  }
+
+  void _demoDrive() {
     _timer?.cancel();
     _timer = Timer.periodic(tick, (_) {
       final t = state;

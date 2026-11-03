@@ -47,9 +47,37 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
 
   bool get _isPickup => widget.mode == MapPickerMode.pickup;
 
+  /// The rider dragged the map, so their choice wins over GPS updates.
+  bool _userMoved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Phones often give a rough position first; ask for a precise one.
+    if (_isPickup) {
+      Future.microtask(
+        () => ref.read(locationControllerProvider.notifier).refresh(),
+      );
+    }
+  }
+
+  /// A better GPS fix arrived: move the pin there unless the rider moved it.
+  void _onLocation(LocationState? prev, LocationState next) {
+    if (!_isPickup || _userMoved || next.isFallback) return;
+    if (const Distance()(_center, next.position) < 15) return;
+    try {
+      _map.move(next.position, _map.camera.zoom);
+    } catch (_) {
+      return; // map not shown yet; it opens at the latest position
+    }
+    _center = next.position;
+    _lookup();
+  }
+
   void _onMove(MapCamera camera, bool hasGesture) {
     _center = camera.center;
     if (!hasGesture) return;
+    _userMoved = true;
     if (!_dragging) setState(() => _dragging = true);
     _debounce?.cancel();
     // Wait until the rider stops moving the map (Nominatim: 1 req/sec).
@@ -148,7 +176,10 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
     }
   }
 
-  void _recenter() {
+  Future<void> _recenter() async {
+    _userMoved = false;
+    await ref.read(locationControllerProvider.notifier).refresh();
+    if (!mounted) return;
     final me = ref.read(locationControllerProvider).position;
     _map.move(me, MapConfig.defaultZoom + 1);
     _center = me;
@@ -165,6 +196,8 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
   Widget build(BuildContext context) {
     final photo = ref.watch(authControllerProvider).profile.photo;
     final note = ref.watch(bookingControllerProvider).pickupNote;
+    ref.listen(locationControllerProvider, _onLocation);
+    final loc = ref.watch(locationControllerProvider);
 
     return Scaffold(
       body: Column(
@@ -266,6 +299,20 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (_isPickup) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        !_userMoved && !loc.isPrecise
+                            ? 'Getting your exact location... You can also drag the map to put the pin where you are.'
+                            : 'Drag the map to put the pin exactly where you are.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: !_userMoved && !loc.isPrecise
+                              ? AppColors.warning
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                     const Divider(height: 32),
                     Row(
                       children: [

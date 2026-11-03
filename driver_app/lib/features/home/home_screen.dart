@@ -53,7 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_mapReady) _map.move(p, zoom ?? _map.camera.zoom);
   }
 
-  void _toggleOnline() {
+  Future<void> _toggleOnline() async {
     final ctrl = ref.read(driverProvider.notifier);
     final d = ref.read(driverProvider);
     if (d.online) {
@@ -65,7 +65,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _showBlocked(reason);
       return;
     }
-    ctrl.goOnline();
+    final problem = await ctrl.goOnline();
+    if (problem != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(problem), duration: const Duration(seconds: 6)),
+      );
+    }
   }
 
   void _showBlocked(String reason) {

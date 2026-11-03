@@ -194,6 +194,11 @@ class DriverController extends Notifier<DriverState> {
   AudioPlayer? _player;
   bool _paused = false;
   LatLng? _lastSent;
+  DateTime? _lastSentAt;
+
+  /// When the phone last gave us a GPS reading while online.
+  DateTime? _lastFix;
+  Timer? _gpsCheck;
   final _seen = <String>{};
 
   @override
@@ -243,10 +248,19 @@ class DriverController extends Notifier<DriverState> {
   String? get _uid => Backend.user?.id;
 
   /// Online: the driver appears on riders' maps and receives requests.
-  Future<void> goOnline() async {
-    if (state.online) return;
+  /// Returns a message when the driver can't go online (no GPS).
+  Future<String?> goOnline() async {
+    if (state.online) return null;
     final uid = _uid;
-    if (uid == null) return;
+    if (uid == null) return 'Please sign in again.';
+    // Riders are matched by distance, so a real GPS position is required.
+    final loc = ref.read(locationControllerProvider.notifier);
+    if (ref.read(locationControllerProvider).isFallback) {
+      await loc.requestAndLocate();
+    }
+    if (ref.read(locationControllerProvider).isFallback) {
+      return 'We could not find your location. Turn on Location (GPS) for GoRide Driver in your phone settings, then try again.';
+    }
     syncLocation();
     state = state.copyWith(online: true, onlineSince: DateTime.now());
     _paused = false;
@@ -258,27 +272,66 @@ class DriverController extends Notifier<DriverState> {
       (_) => _sendLocation(),
     );
     _listen();
+    return null;
   }
 
-  /// Follows the phone's real GPS while online.
-  void _startGps() {
+  void _onFix(Position p) {
+    _lastFix = DateTime.now();
+    // In demo drive the trip moves the car instead.
+    if (ref.read(demoDriveProvider) && _paused) return;
+    setPosition(
+      LatLng(p.latitude, p.longitude),
+      heading: p.heading > 0 ? p.heading : state.heading,
+    );
+  }
+
+  /// Follows the phone's real GPS while online. If the background GPS
+  /// service can't start on this phone, it falls back to normal GPS, and a
+  /// check every 10 seconds asks the phone directly if readings stop.
+  void _startGps({bool background = true}) {
     _gps?.cancel();
     try {
-      _gps = Geolocator.getPositionStream(locationSettings: _gpsSettings())
-          .listen((p) {
-            // In demo drive the trip moves the car instead.
-            if (ref.read(demoDriveProvider) && _paused) return;
-            setPosition(
-              LatLng(p.latitude, p.longitude),
-              heading: p.heading > 0 ? p.heading : state.heading,
-            );
-          }, onError: (_) {});
-    } catch (_) {}
+      _gps =
+          Geolocator.getPositionStream(
+            locationSettings: background
+                ? _gpsSettings()
+                : const LocationSettings(
+                    accuracy: LocationAccuracy.high,
+                    distanceFilter: 5,
+                  ),
+          ).listen(
+            _onFix,
+            onError: (_) {
+              if (background) _startGps(background: false);
+            },
+          );
+    } catch (_) {
+      if (background) _startGps(background: false);
+    }
+    _gpsCheck?.cancel();
+    _gpsCheck = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!state.online) return;
+      if (_lastFix != null &&
+          DateTime.now().difference(_lastFix!) < const Duration(seconds: 15)) {
+        return;
+      }
+      try {
+        _onFix(
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 8),
+            ),
+          ),
+        );
+      } catch (_) {}
+    });
   }
 
   Future<void> goOffline() async {
     _gps?.cancel();
     _gps = null;
+    _gpsCheck?.cancel();
     _countdown?.cancel();
     _publish?.cancel();
     _poll?.cancel();
@@ -317,8 +370,16 @@ class DriverController extends Notifier<DriverState> {
     if (uid == null) return;
     final p = state.position;
     const dist = Distance();
-    if (!force && _lastSent != null && dist(_lastSent!, p) < 5) return;
+    // Send when the car moves, and at least every 20 seconds while parked so
+    // the server knows the driver is still online and nearby.
+    final recent =
+        _lastSentAt != null &&
+        DateTime.now().difference(_lastSentAt!) < const Duration(seconds: 20);
+    if (!force && _lastSent != null && dist(_lastSent!, p) < 5 && recent) {
+      return;
+    }
     _lastSent = p;
+    _lastSentAt = DateTime.now();
     final reg = ref.read(registrationProvider);
     try {
       await Backend.db.from('driver_locations').upsert({

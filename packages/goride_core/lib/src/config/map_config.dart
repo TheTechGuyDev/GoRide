@@ -1,4 +1,5 @@
 import '../backend/backend.dart';
+
 import 'package:latlong2/latlong.dart';
 
 /// Free map configuration. No API keys needed.

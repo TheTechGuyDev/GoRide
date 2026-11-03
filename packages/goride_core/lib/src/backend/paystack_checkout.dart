@@ -44,9 +44,7 @@ class PaystackCheckout {
       }
       return null;
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(AuthService.message(e))),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(AuthService.message(e))));
       return null;
     }
 
@@ -61,7 +59,8 @@ class PaystackCheckout {
     final paid = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _WaitingDialog(reference: reference, amount: amount, url: url),
+      builder: (_) =>
+          _WaitingDialog(reference: reference, amount: amount, url: url),
     );
     return paid == true ? reference : null;
   }
@@ -178,7 +177,9 @@ class _WaitingDialogState extends State<_WaitingDialog> {
         return;
       }
       if (status == 'failed' || status == 'abandoned') {
-        setState(() => _note = 'The payment was not completed. You can try again.');
+        setState(
+          () => _note = 'The payment was not completed. You can try again.',
+        );
       } else if (manual) {
         setState(() => _note = 'We have not received the payment yet.');
       }

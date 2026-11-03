@@ -38,6 +38,7 @@ class Backend {
       };
     } catch (_) {}
   }
+
   static GoTrueClient get auth => db.auth;
   static User? get user => _ready ? auth.currentUser : null;
   static bool get signedIn => user != null;

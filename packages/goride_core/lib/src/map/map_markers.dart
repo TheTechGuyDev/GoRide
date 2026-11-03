@@ -2,8 +2,8 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:flutter_map/flutter_map.dart' show Marker, MarkerLayer;
+import 'package:latlong2/latlong.dart' show LatLng;
 
 import '../theme/app_colors.dart';
 

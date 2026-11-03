@@ -234,28 +234,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ],
                 ),
-              MarkerLayer(
-                markers: [
-                  if (d.request != null)
+              if (d.request != null)
+                MarkerLayer(
+                  markers: [
                     placeMarker(d.request!.pickup.position, pickup: true),
-                  Marker(
-                    point: d.position,
-                    width: d.online ? 110 : 60,
-                    height: d.online ? 110 : 60,
-                    child: d.online
-                        ? PulseRings(
-                            size: 110,
-                            child: VehicleMarker(
-                              heading: d.heading,
-                              type: _markerType(kind),
-                            ),
-                          )
-                        : VehicleMarker(
-                            heading: d.heading,
-                            type: _markerType(kind),
-                          ),
-                  ),
-                ],
+                  ],
+                ),
+              SmoothMarker(
+                point: d.position,
+                size: d.online ? 110 : 60,
+                child: d.online
+                    ? PulseRings(
+                        size: 110,
+                        child: VehicleMarker(
+                          heading: d.heading,
+                          type: _markerType(kind),
+                        ),
+                      )
+                    : VehicleMarker(
+                        heading: d.heading,
+                        type: _markerType(kind),
+                      ),
               ),
               const SimpleAttributionWidget(
                 source: Text(MapConfig.attribution),

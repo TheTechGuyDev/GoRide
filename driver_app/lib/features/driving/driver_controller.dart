@@ -195,6 +195,7 @@ class DriverController extends Notifier<DriverState> {
   bool _paused = false;
   LatLng? _lastSent;
   DateTime? _lastSentAt;
+  bool _sending = false;
 
   /// When the phone last gave us a GPS reading while online.
   DateTime? _lastFix;
@@ -268,7 +269,7 @@ class DriverController extends Notifier<DriverState> {
     await _sendLocation(force: true, online: true);
     _publish?.cancel();
     _publish = Timer.periodic(
-      const Duration(seconds: 3),
+      const Duration(seconds: 1),
       (_) => _sendLocation(),
     );
     _listen();
@@ -297,7 +298,7 @@ class DriverController extends Notifier<DriverState> {
                 ? _gpsSettings()
                 : const LocationSettings(
                     accuracy: LocationAccuracy.high,
-                    distanceFilter: 5,
+                    distanceFilter: 2,
                   ),
           ).listen(
             _onFix,
@@ -368,6 +369,8 @@ class DriverController extends Notifier<DriverState> {
   Future<void> _sendLocation({bool force = false, bool? online}) async {
     final uid = _uid;
     if (uid == null) return;
+    // On a slow network, don't pile up requests: skip until the last one lands.
+    if (_sending && !force) return;
     final p = state.position;
     const dist = Distance();
     // Send when the car moves, and at least every 20 seconds while parked so
@@ -375,13 +378,14 @@ class DriverController extends Notifier<DriverState> {
     final recent =
         _lastSentAt != null &&
         DateTime.now().difference(_lastSentAt!) < const Duration(seconds: 20);
-    if (!force && _lastSent != null && dist(_lastSent!, p) < 5 && recent) {
+    if (!force && _lastSent != null && dist(_lastSent!, p) < 2 && recent) {
       return;
     }
     _lastSent = p;
     _lastSentAt = DateTime.now();
     final reg = ref.read(registrationProvider);
     try {
+      _sending = true;
       await Backend.db.from('driver_locations').upsert({
         'driver_id': uid,
         'lat': p.latitude,
@@ -391,14 +395,17 @@ class DriverController extends Notifier<DriverState> {
         'ride_type_id': ?reg.vehicle?.rideTypeId,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _sending = false;
+    }
   }
 
   /// Keeps sharing the position during a trip even if requests are paused.
   void keepSharingLocation() {
     if (_publish == null || !_publish!.isActive) {
       _publish = Timer.periodic(
-        const Duration(seconds: 3),
+        const Duration(seconds: 1),
         (_) => _sendLocation(),
       );
     }
@@ -623,8 +630,8 @@ LocationSettings _gpsSettings() {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     return AndroidSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 5,
-      intervalDuration: const Duration(seconds: 3),
+      distanceFilter: 2,
+      intervalDuration: const Duration(seconds: 1),
       foregroundNotificationConfig: const ForegroundNotificationConfig(
         notificationTitle: 'GoRide Driver is online',
         notificationText: 'Sharing your location so riders can find you',
@@ -635,6 +642,6 @@ LocationSettings _gpsSettings() {
   }
   return const LocationSettings(
     accuracy: LocationAccuracy.high,
-    distanceFilter: 5,
+    distanceFilter: 2,
   );
 }

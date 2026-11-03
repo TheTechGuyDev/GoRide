@@ -368,20 +368,18 @@ class _TripScreenState extends ConsumerState<TripScreen> {
                                       color: AppColors.error,
                                     ),
                                   ),
-                                if (showDriver)
-                                  Marker(
-                                    point: trip.driverPosition!,
-                                    width: 48,
-                                    height: 48,
-                                    child: VehicleMarker(
-                                      heading: trip.driverHeading,
-                                      type:
-                                          trip.rideType.kind == VehicleKind.bike
-                                          ? VehicleType.bike
-                                          : VehicleType.car,
-                                    ),
-                                  ),
                               ],
+                            ),
+                          // The car glides between live updates.
+                          if (showDriver)
+                            SmoothMarker(
+                              point: trip.driverPosition!,
+                              child: VehicleMarker(
+                                heading: trip.driverHeading,
+                                type: trip.rideType.kind == VehicleKind.bike
+                                    ? VehicleType.bike
+                                    : VehicleType.car,
+                              ),
                             ),
                         ],
                       ),

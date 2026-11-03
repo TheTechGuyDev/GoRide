@@ -2,6 +2,8 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../theme/app_colors.dart';
 
@@ -260,6 +262,47 @@ class _PulseRingsState extends State<PulseRings>
         shape: BoxShape.circle,
         color: AppColors.primary.withValues(alpha: 0.28 * (1 - t)),
       ),
+    );
+  }
+}
+
+/// Animates between two map points.
+class LatLngTween extends Tween<LatLng> {
+  LatLngTween({super.begin, super.end});
+
+  @override
+  LatLng lerp(double t) => LatLng(
+    begin!.latitude + (end!.latitude - begin!.latitude) * t,
+    begin!.longitude + (end!.longitude - begin!.longitude) * t,
+  );
+}
+
+/// One marker (a map layer) that glides to each new position instead of
+/// jumping, so a car moves smoothly between GPS updates.
+class SmoothMarker extends StatelessWidget {
+  const SmoothMarker({
+    super.key,
+    required this.point,
+    required this.child,
+    this.size = 48,
+    this.duration = const Duration(milliseconds: 1000),
+  });
+
+  final LatLng point;
+  final Widget child;
+  final double size;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<LatLng>(
+      tween: LatLngTween(begin: point, end: point),
+      duration: duration,
+      curve: Curves.linear,
+      builder: (context, p, child) => MarkerLayer(
+        markers: [Marker(point: p, width: size, height: size, child: child!)],
+      ),
+      child: child,
     );
   }
 }

@@ -16,6 +16,7 @@ import '../../core/router/routes.dart';
 import '../../core/widgets/common.dart';
 import '../earnings/earnings_controller.dart';
 import '../registration/registration_controller.dart';
+import '../driving/driver_controller.dart';
 import 'trip_controller.dart';
 
 /// Opens turn-by-turn directions in Google Maps (free, no API key).
@@ -161,10 +162,13 @@ class _TripScreenState extends ConsumerState<TripScreen> {
         _lastStage = next.stage;
         _follow = true;
         WidgetsBinding.instance.addPostFrameCallback((_) => _fit(next));
-      } else if (_follow && _mapReady && prev?.position != next.position) {
-        // Keep the car in view without jumping every tick.
-        final bounds = _map.camera.visibleBounds;
-        if (!bounds.contains(next.position)) _fit(next);
+      }
+    });
+    // The car follows the phone's GPS straight away; the map keeps it centred.
+    final live = ref.watch(driverProvider);
+    ref.listen(driverProvider.select((d) => d.position), (prev, next) {
+      if (_follow && _mapReady && prev != next) {
+        _map.move(next, _map.camera.zoom < 15 ? 16 : _map.camera.zoom);
       }
     });
 
@@ -238,22 +242,19 @@ class _TripScreenState extends ConsumerState<TripScreen> {
                   ],
                 ),
               MarkerLayer(
-                markers: [
-                  placeMarker(target.position, pickup: toPickup),
-                  Marker(
-                    point: t.position,
-                    width: 60,
-                    height: 60,
-                    child: VehicleMarker(
-                      heading: t.heading,
-                      type: switch (kind) {
-                        VehicleKind.bike => VehicleType.bike,
-                        VehicleKind.keke => VehicleType.keke,
-                        VehicleKind.car => VehicleType.car,
-                      },
-                    ),
-                  ),
-                ],
+                markers: [placeMarker(target.position, pickup: toPickup)],
+              ),
+              SmoothMarker(
+                point: live.position,
+                size: 60,
+                child: VehicleMarker(
+                  heading: live.heading,
+                  type: switch (kind) {
+                    VehicleKind.bike => VehicleType.bike,
+                    VehicleKind.keke => VehicleType.keke,
+                    VehicleKind.car => VehicleType.car,
+                  },
+                ),
               ),
               const SimpleAttributionWidget(
                 source: Text(MapConfig.attribution),

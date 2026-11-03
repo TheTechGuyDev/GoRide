@@ -66,6 +66,53 @@ class PaystackCheckout {
     return paid == true ? reference : null;
   }
 
+  /// Charges a saved card straight away (no Paystack page). Returns the
+  /// reference when paid, or null (a message is shown).
+  static Future<String?> chargeSaved(
+    BuildContext context, {
+    required String cardId,
+    required int amount,
+    String purpose = 'top_up',
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final res = await Backend.db.functions.invoke(
+        'paystack',
+        body: {
+          'action': 'charge_card',
+          'card_id': cardId,
+          'amount': amount,
+          'purpose': purpose,
+        },
+      );
+      final data = Map<String, dynamic>.from(res.data as Map);
+      if (data['status'] == 'success') return data['reference'] as String?;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            data['status'] == 'pending'
+                ? 'Your bank is still confirming. We will add it once it clears.'
+                : 'Card declined: ${data['error'] ?? 'try another card'}',
+          ),
+        ),
+      );
+    } on FunctionException catch (e) {
+      final details = e.details;
+      final error = details is Map ? details['error']?.toString() : null;
+      if (!context.mounted) return null;
+      if (error == 'not_configured') {
+        await _notReady(context);
+      } else {
+        messenger.showSnackBar(
+          SnackBar(content: Text(error ?? 'Could not charge the card.')),
+        );
+      }
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(AuthService.message(e))));
+    }
+    return null;
+  }
+
   static Future<void> _notReady(BuildContext context) => showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(

@@ -1,4 +1,3 @@
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/services/routing_service.dart';
@@ -75,7 +74,6 @@ class ScheduledRide {
 }
 
 class ScheduledRidesController extends Notifier<List<ScheduledRide>> {
-
   /// Rides can be booked from 30 minutes to 7 days ahead.
   static const minLead = Duration(minutes: 30);
   static const maxLead = Duration(days: 7);

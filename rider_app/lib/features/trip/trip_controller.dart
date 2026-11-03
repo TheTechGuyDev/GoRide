@@ -135,11 +135,21 @@ class TripController extends Notifier<TripState?> {
     final payment = switch (booking.paymentId) {
       'wallet' => 'wallet',
       'cash' => 'cash',
+      final id when id.length == 36 => 'card',
       _ => null,
     };
+    // The chosen card becomes the one the server charges.
+    if (payment == 'card') {
+      try {
+        await Backend.db.rpc(
+          'set_default_card',
+          params: {'p_card': booking.paymentId},
+        );
+      } catch (_) {}
+    }
     if (payment == null) {
       return _bookingFailed(
-        'Card and bank transfer payments are coming soon. Pay with your wallet or cash for now.',
+        'Bank transfer tops up your wallet. Top up, then pay with your wallet, a saved card or cash.',
       );
     }
     try {

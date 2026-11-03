@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:goride_core/goride_core.dart' show PushPromptCard;
 
 import '../../core/router/routes.dart';
 import '../../core/theme/app_colors.dart';
@@ -19,6 +20,11 @@ class HomeTab extends ConsumerWidget {
     return Column(
       children: [
         const Expanded(child: HomeMapScreen()),
+        const PushPromptCard(
+          app: 'rider',
+          message: 'Get alerts when your driver is coming',
+        ),
+        const SizedBox(height: 8),
         AnimatedSize(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,

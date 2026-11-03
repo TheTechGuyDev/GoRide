@@ -9,6 +9,7 @@ import 'package:goride_core/goride_core.dart'
         PostgresChangeFilter,
         PostgresChangeFilterType,
         RealtimeChannel,
+        PaystackCheckout,
         userIdProvider;
 
 import '../../core/notifications/notification_service.dart';
@@ -138,12 +139,11 @@ final walletBalanceProvider = NotifierProvider<WalletController, int>(
   WalletController.new,
 );
 
-/// Saved payment methods. Cards are added through Paystack: in the live app
-/// Paystack charges ₦50 to verify the card, refunds it, and gives us a
-/// reusable authorization code. We never store full card numbers.
+/// Payment methods: wallet, cash, bank transfer and the rider's saved cards.
+/// A card is saved by Paystack after a card payment (we keep only the last 4
+/// digits; Paystack holds the card). We never see full card numbers.
 class PaymentMethodsController extends Notifier<List<PaymentMethod>> {
-  @override
-  List<PaymentMethod> build() => const [
+  static const _builtIn = [
     PaymentMethod(
       id: 'wallet',
       kind: PaymentKind.wallet,
@@ -157,35 +157,102 @@ class PaymentMethodsController extends Notifier<List<PaymentMethod>> {
       subtitle: 'Pay your driver directly',
     ),
     PaymentMethod(
-      id: 'card-4679',
-      kind: PaymentKind.card,
-      title: 'Mastercard',
-      subtitle: '•••• •••• •••• 4679',
-    ),
-    PaymentMethod(
       id: 'transfer',
       kind: PaymentKind.transfer,
       title: 'Bank Transfer',
-      subtitle: 'Pay to a one-time account number',
+      subtitle: 'Top up your wallet by transfer',
     ),
   ];
 
-  void addCard({required String brand, required String last4}) {
-    final card = PaymentMethod(
-      id: 'card-$last4-${DateTime.now().millisecondsSinceEpoch % 10000}',
-      kind: PaymentKind.card,
-      title: brand,
-      subtitle: '•••• •••• •••• $last4',
-    );
-    // Cards sit after Cash, before Bank Transfer.
-    final i = state.lastIndexWhere((m) => m.kind != PaymentKind.transfer) + 1;
-    state = [...state]..insert(i, card);
+  @override
+  List<PaymentMethod> build() {
+    final uid = ref.watch(userIdProvider);
+    if (uid != null) Future.microtask(load);
+    return _builtIn;
   }
 
-  /// Only cards can be removed; wallet, cash and transfer are built in.
-  void remove(String id) => state = state
-      .where((m) => m.id != id || m.kind != PaymentKind.card)
-      .toList();
+  List<PaymentMethod> get cards =>
+      state.where((m) => m.kind == PaymentKind.card).toList();
+
+  Future<void> load() async {
+    try {
+      final rows = await Backend.db
+          .from('payment_cards')
+          .select('id, brand, last4, exp, bank, is_default, created_at')
+          .order('is_default', ascending: false)
+          .order('created_at');
+      state = [
+        _builtIn[0],
+        _builtIn[1],
+        for (final r in rows)
+          PaymentMethod(
+            id: r['id'] as String,
+            kind: PaymentKind.card,
+            title:
+                '${r['brand']}${r['is_default'] == true ? ' (default)' : ''}',
+            subtitle: '•••• •••• •••• ${r['last4']}  ·  ${r['exp']}',
+          ),
+        _builtIn[2],
+      ];
+    } catch (_) {}
+  }
+
+  /// Pays ₦100 with Paystack to save a card. The ₦100 stays in the wallet.
+  Future<bool> addCard(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add a card'),
+        content: const Text(
+          'Paystack will charge your card 100 naira to save it securely. '
+          'The 100 naira goes into your GoRide wallet, so you lose nothing.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return false;
+    final before = cards.length;
+    final ref0 = await PaystackCheckout.pay(
+      context,
+      amount: 100,
+      purpose: 'add_card',
+    );
+    if (ref0 == null) return false;
+    await load();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            cards.length > before
+                ? 'Card saved. 100 naira added to your wallet.'
+                : '100 naira added to your wallet. This card type cannot be saved for later; try a Visa, Mastercard or Verve debit card.',
+          ),
+        ),
+      );
+    }
+    return cards.length > before;
+  }
+
+  /// Trips paid by card use this card.
+  Future<void> makeDefault(String id) async {
+    await Backend.db.rpc('set_default_card', params: {'p_card': id});
+    await load();
+  }
+
+  Future<void> remove(String id) async {
+    state = state.where((m) => m.id != id).toList();
+    await Backend.db.from('payment_cards').delete().eq('id', id);
+    await load();
+  }
 }
 
 final paymentMethodsProvider =

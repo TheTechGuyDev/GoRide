@@ -194,6 +194,54 @@ class _EarningsTabState extends ConsumerState<EarningsTab> {
               ],
             ),
           ),
+          if (_weeksAgo == 0 && e.power.enabled)
+            GoCard(
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.bolt, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Power Driver day',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          e.powerDay.completed
+                              ? e.powerDay.doneText!
+                              : '${e.powerDay.done} of ${e.powerDay.target} trips today · ${e.power.rate}% commission all day',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: e.powerDay.progress,
+                            minHeight: 7,
+                            color: AppColors.primary,
+                            backgroundColor: AppColors.border,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           if (_weeksAgo == 0)
             GoCard(
               child: Row(

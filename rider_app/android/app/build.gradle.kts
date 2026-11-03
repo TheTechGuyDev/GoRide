@@ -30,11 +30,24 @@ android {
         versionName = flutter.versionName
     }
 
+    // Release key from the build server (GitHub secrets). Without it the
+    // debug key is used, which still installs fine on phones.
+    val keystore = System.getenv("ANDROID_KEYSTORE_PATH")
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("ANDROID_KEY_PASSWORD")
+                keyAlias = "goride"
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystore != null) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
         }
     }
 }

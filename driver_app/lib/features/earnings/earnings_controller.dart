@@ -147,9 +147,13 @@ class Quest {
     required this.done,
     required this.reward,
     required this.ends,
+    this.todoText,
+    this.doneText,
   });
 
   final String title;
+  final String? todoText;
+  final String? doneText;
   final int target;
   final int done;
   final int reward;
@@ -165,7 +169,11 @@ class EarningsState {
     this.txs = const [],
     this.onlineMinutesByDay = const {},
     this.questPaid = false,
+    this.power = const PowerConfig(),
   });
+
+  /// Power Driver day rules from the server (app_settings).
+  final PowerConfig power;
 
   /// Newest first.
   final List<TripRecord> trips;
@@ -218,6 +226,23 @@ class EarningsState {
     );
   }
 
+  /// Power Driver day: lower commission once today's target is reached.
+  Quest get powerDay {
+    final now = DateTime.now();
+    final done = tripsOn(now).length;
+    final left = power.trips - done;
+    return Quest(
+      title: 'Power Driver day',
+      target: power.trips,
+      done: done,
+      reward: 0,
+      ends: DateTime(now.year, now.month, now.day + 1),
+      todoText:
+          '$left more trip${left == 1 ? '' : 's'} today for ${power.rate}% commission all day',
+      doneText: 'Power Driver day! ${power.rate}% commission for all of today',
+    );
+  }
+
   double get averageRating {
     final rated = trips.where((t) => t.ratingFromRider != null).take(100);
     if (rated.isEmpty) return 5;
@@ -237,14 +262,23 @@ class EarningsState {
     List<WalletTx>? txs,
     Map<String, int>? onlineMinutesByDay,
     bool? questPaid,
+    PowerConfig? power,
   }) {
     return EarningsState(
+      power: power ?? this.power,
       trips: trips ?? this.trips,
       txs: txs ?? this.txs,
       onlineMinutesByDay: onlineMinutesByDay ?? this.onlineMinutesByDay,
       questPaid: questPaid ?? this.questPaid,
     );
   }
+}
+
+class PowerConfig {
+  const PowerConfig({this.enabled = true, this.trips = 20, this.rate = 7});
+  final bool enabled;
+  final int trips;
+  final num rate;
 }
 
 String dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
@@ -272,7 +306,15 @@ class EarningsController extends Notifier<EarningsState> {
             .select()
             .order('created_at', ascending: false)
             .limit(1000),
+        Backend.db
+            .from('app_settings')
+            .select(
+              'power_driver_enabled, power_driver_trips, power_driver_rate',
+            )
+            .eq('id', 1)
+            .maybeSingle(),
       ]);
+      final ps = results[2] as Map<String, dynamic>?;
       final trips = [
         for (final t in results[0] as List)
           _trip(Map<String, dynamic>.from(t as Map)),
@@ -281,7 +323,17 @@ class EarningsController extends Notifier<EarningsState> {
         for (final r in results[1] as List)
           _tx(Map<String, dynamic>.from(r as Map)),
       ];
-      state = state.copyWith(trips: trips, txs: txs);
+      state = state.copyWith(
+        trips: trips,
+        txs: txs,
+        power: ps == null
+            ? null
+            : PowerConfig(
+                enabled: ps['power_driver_enabled'] == true,
+                trips: (ps['power_driver_trips'] as num).toInt(),
+                rate: ps['power_driver_rate'] as num,
+              ),
+      );
     } catch (_) {}
     _channel ??= Backend.db
         .channel('driver-wallet-$uid')

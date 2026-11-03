@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -262,13 +264,8 @@ class DriverController extends Notifier<DriverState> {
   void _startGps() {
     _gps?.cancel();
     try {
-      _gps =
-          Geolocator.getPositionStream(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-              distanceFilter: 5,
-            ),
-          ).listen((p) {
+      _gps = Geolocator.getPositionStream(locationSettings: _gpsSettings())
+          .listen((p) {
             // In demo drive the trip moves the car instead.
             if (ref.read(demoDriveProvider) && _paused) return;
             setPosition(
@@ -558,3 +555,25 @@ class DriverController extends Notifier<DriverState> {
 final driverProvider = NotifierProvider<DriverController, DriverState>(
   DriverController.new,
 );
+
+/// On Android phones GPS keeps running when the app is in the background or
+/// the screen is off (a "GoRide Driver is online" notification shows).
+LocationSettings _gpsSettings() {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    return AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
+      intervalDuration: const Duration(seconds: 3),
+      foregroundNotificationConfig: const ForegroundNotificationConfig(
+        notificationTitle: 'GoRide Driver is online',
+        notificationText: 'Sharing your location so riders can find you',
+        enableWakeLock: true,
+        setOngoing: true,
+      ),
+    );
+  }
+  return const LocationSettings(
+    accuracy: LocationAccuracy.high,
+    distanceFilter: 5,
+  );
+}

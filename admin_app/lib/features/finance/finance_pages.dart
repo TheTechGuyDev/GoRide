@@ -9,6 +9,7 @@ import '../../core/widgets/ui.dart';
 import '../../data/models.dart';
 import '../../data/store.dart';
 import '../overview/overview_page.dart';
+import 'engine_panel.dart';
 
 // ---------------- Revenue ----------------
 
@@ -685,139 +686,8 @@ class PricingPage extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const PaystackPanel(),
+        const EnginePanel(),
       ],
-    );
-  }
-}
-
-/// Paystack keys. The public key is safe in the apps; the secret key is
-/// stored only on the server (Supabase secrets), never shown again.
-class PaystackPanel extends ConsumerStatefulWidget {
-  const PaystackPanel({super.key});
-
-  @override
-  ConsumerState<PaystackPanel> createState() => _PaystackPanelState();
-}
-
-class _PaystackPanelState extends ConsumerState<PaystackPanel> {
-  late final _public = TextEditingController(
-    text: ref.read(storeProvider).settings.paystackPublicKey,
-  );
-  final _secret = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _public.dispose();
-    _secret.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    final pk = _public.text.trim();
-    final sk = _secret.text.trim();
-    if (pk.isNotEmpty &&
-        !RegExp(r'^pk_(test|live)_[A-Za-z0-9]{10,}$').hasMatch(pk)) {
-      setState(
-        () => _error = 'Public key should start with pk_test_ or pk_live_',
-      );
-      return;
-    }
-    if (sk.isNotEmpty &&
-        !RegExp(r'^sk_(test|live)_[A-Za-z0-9]{10,}$').hasMatch(sk)) {
-      setState(
-        () => _error = 'Secret key should start with sk_test_ or sk_live_',
-      );
-      return;
-    }
-    setState(() => _error = null);
-    final s = ref.read(storeProvider).settings;
-    ref
-        .read(storeProvider.notifier)
-        .saveSettings(
-          s.copyWith(
-            paystackPublicKey: pk,
-            paystackSecretSet: sk.isNotEmpty || s.paystackSecretSet,
-            paystackLive: pk.startsWith('pk_live_'),
-          ),
-          'Updated Paystack keys (${pk.startsWith('pk_live_') ? 'live' : 'test'} mode)',
-        );
-    _secret.clear();
-    toast(context, 'Paystack keys saved');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = ref.watch(storeProvider).settings;
-    final connected = s.paystackPublicKey.isNotEmpty && s.paystackSecretSet;
-    return Panel(
-      title: 'Payments (Paystack)',
-      subtitle: 'Free to set up. Paystack charges per successful payment only.',
-      action: Pill(
-        connected ? (s.paystackLive ? 'Live' : 'Test mode') : 'Simulated',
-        color: connected ? (s.paystackLive ? AC.primary : AC.orange) : AC.muted,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Find your keys in Paystack Dashboard > Settings > API Keys & Webhooks. Until keys are added, top-ups and payouts are simulated.',
-            style: TextStyle(color: AC.muted, height: 1.5),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              SizedBox(
-                width: 420,
-                child: TextField(
-                  controller: _public,
-                  decoration: const InputDecoration(
-                    labelText: 'Public key',
-                    hintText: 'pk_test_...',
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 420,
-                child: TextField(
-                  controller: _secret,
-                  obscureText: true,
-                  decoration: InputDecoration(
-                    labelText: 'Secret key',
-                    hintText: s.paystackSecretSet
-                        ? 'Saved on the server. Paste a new one to replace it'
-                        : 'sk_test_...',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(_error!, style: const TextStyle(color: AC.red)),
-          ],
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              PrimaryButton(
-                label: 'Save keys',
-                icon: Icons.key,
-                onPressed: _save,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  'The secret key is sent to the server once and never shown again.',
-                  style: TextStyle(fontSize: 12.5, color: AC.faint),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

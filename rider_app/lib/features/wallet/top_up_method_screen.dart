@@ -1,66 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:goride_core/goride_core.dart' show PaystackCheckout;
 
-import '../../core/services/payment_gateway.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
 import '../../core/widgets/app_button.dart';
 import '../booking/payment_methods.dart';
 
-final paymentGatewayProvider = Provider<PaymentGateway>(
-  (_) => SimulatedPaystack(),
-);
-
-class _MethodOption {
-  const _MethodOption(
-    this.method,
-    this.title,
-    this.subtitle,
-    this.icon,
-    this.color,
-  );
-  final TopUpMethod method;
+class _Option {
+  const _Option(this.id, this.title, this.subtitle, this.icon, this.color);
+  final String id; // a saved card id, or 'paystack'
   final String title;
   final String subtitle;
   final IconData icon;
   final Color color;
 }
 
-const _options = [
-  _MethodOption(
-    TopUpMethod.savedCard,
-    'Mastercard',
-    '•••• •••• •••• 4679',
-    Icons.credit_card,
-    Color(0xFF1A237E),
-  ),
-  _MethodOption(
-    TopUpMethod.newCard,
-    'New debit card',
-    'Verve, Mastercard or Visa via Paystack',
-    Icons.add_card,
-    Color(0xFF00897B),
-  ),
-  _MethodOption(
-    TopUpMethod.transfer,
-    'Bank Transfer',
-    'Send to a one-time account number',
-    Icons.account_balance,
-    Color(0xFF6A1B9A),
-  ),
-  _MethodOption(
-    TopUpMethod.ussd,
-    'USSD',
-    'Pay with your bank\'s USSD code, no data needed',
-    Icons.dialpad,
-    Color(0xFFEF6C00),
-  ),
-];
-
-/// Screen 65: choose how to pay, then Paystack checkout.
+/// Screen 65: choose how to pay. A saved card is charged at once; anything
+/// else opens Paystack's secure page (card, bank transfer or USSD). The
+/// server credits the wallet once Paystack confirms.
 class TopUpMethodScreen extends ConsumerStatefulWidget {
   const TopUpMethodScreen({super.key, required this.amount});
 
@@ -71,48 +30,46 @@ class TopUpMethodScreen extends ConsumerStatefulWidget {
 }
 
 class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
-  TopUpMethod _method = TopUpMethod.savedCard;
+  String? _selected;
   bool _busy = false;
 
-  String get _methodLabel => switch (_method) {
-    TopUpMethod.savedCard => 'Mastercard •••• 4679',
-    TopUpMethod.newCard => 'Debit card',
-    TopUpMethod.transfer => 'Bank Transfer',
-    TopUpMethod.ussd => 'USSD',
-  };
+  List<_Option> _options(List<PaymentMethod> cards) => [
+    for (final c in cards)
+      _Option(
+        c.id,
+        c.title.replaceAll(' (default)', ''),
+        c.subtitle,
+        Icons.credit_card,
+        const Color(0xFF1A237E),
+      ),
+    const _Option(
+      'paystack',
+      'Card, bank transfer or USSD',
+      'Pay on Paystack\'s secure page',
+      Icons.lock_outline,
+      Color(0xFF00897B),
+    ),
+  ];
 
-  /// Paystack's secure page handles card, bank transfer and USSD; the
-  /// server credits the wallet once Paystack confirms.
-  Future<void> _confirm() async {
+  Future<void> _confirm(_Option o) async {
     setState(() => _busy = true);
-    final reference = await PaystackCheckout.pay(
-      context,
-      amount: widget.amount,
-    );
-    final result = reference == null
-        ? null
-        : TopUpResult(success: true, reference: reference);
+    final reference = o.id == 'paystack'
+        ? await PaystackCheckout.pay(context, amount: widget.amount)
+        : await PaystackCheckout.chargeSaved(
+            context,
+            cardId: o.id,
+            amount: widget.amount,
+          );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (result == null || !result.success) {
-      if (result != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result.message ?? 'Payment failed')),
-        );
-      }
-      return;
-    }
-
+    if (reference == null) return;
     ref
         .read(walletBalanceProvider.notifier)
-        .credit(
-          widget.amount,
-          method: _methodLabel,
-          reference: result.reference,
-        );
+        .credit(widget.amount, method: o.title, reference: reference);
+    // Paying on Paystack's page can save the card for next time.
+    ref.read(paymentMethodsProvider.notifier).load();
     await _showSuccess();
     if (mounted) {
-      // Back to wherever top up was opened from.
       context.pop();
       context.pop();
     }
@@ -160,26 +117,34 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cards = ref.watch(paymentMethodsProvider.notifier).cards;
+    ref.watch(paymentMethodsProvider);
+    final options = _options(cards);
+    final selected = options.firstWhere(
+      (o) => o.id == _selected,
+      orElse: () => options.first,
+    );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Choose Top Up Method')),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          for (final o in _options) ...[
+          for (final o in options) ...[
             Material(
               color: AppColors.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(
-                  color: _method == o.method
+                  color: selected.id == o.id
                       ? AppColors.primary
                       : AppColors.border,
-                  width: _method == o.method ? 2 : 1,
+                  width: selected.id == o.id ? 2 : 1,
                 ),
               ),
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
-                onTap: _busy ? null : () => setState(() => _method = o.method),
+                onTap: _busy ? null : () => setState(() => _selected = o.id),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
@@ -216,7 +181,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
                           ],
                         ),
                       ),
-                      if (_method == o.method)
+                      if (selected.id == o.id)
                         const Icon(Icons.check, color: AppColors.primary),
                     ],
                   ),
@@ -230,9 +195,9 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.lock, size: 14, color: AppColors.textSecondary),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text(
-                'Secured by Paystack · Test mode',
+                'Secured by Paystack. GoRide never sees your card number.',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
             ],
@@ -246,351 +211,9 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
           child: AppButton(
             label: 'Confirm Top Up · ${naira(widget.amount)}',
             loading: _busy,
-            onPressed: _confirm,
+            onPressed: () => _confirm(selected),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SheetHeader extends StatelessWidget {
-  const _SheetHeader({required this.amount, required this.title});
-  final int amount;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF011B33),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text(
-                'paystack',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF4E5),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text(
-                'TEST MODE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.warning,
-                ),
-              ),
-            ),
-            const Spacer(),
-            Text(
-              naira(amount),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
-  }
-}
-
-class _CardCheckout extends StatefulWidget {
-  const _CardCheckout({required this.amount, required this.gateway});
-  final int amount;
-  final PaymentGateway gateway;
-
-  @override
-  State<_CardCheckout> createState() => _CardCheckoutState();
-}
-
-class _CardCheckoutState extends State<_CardCheckout> {
-  // Paystack's official test card.
-  final _number = TextEditingController(text: '4084 0840 8408 4081');
-  final _expiry = TextEditingController(text: '12/30');
-  final _cvv = TextEditingController(text: '408');
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _number.dispose();
-    _expiry.dispose();
-    _cvv.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        MediaQuery.viewInsetsOf(context).bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SheetHeader(amount: widget.amount, title: 'Pay with card'),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _number,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              hintText: 'Card number',
-              prefixIcon: Icon(Icons.credit_card),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _expiry,
-                  decoration: const InputDecoration(hintText: 'MM/YY'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _cvv,
-                  obscureText: true,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(hintText: 'CVV'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Test card pre-filled. No real money moves in test mode.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 18),
-          AppButton(
-            label: 'Pay ${naira(widget.amount)}',
-            loading: _busy,
-            onPressed: () async {
-              setState(() => _busy = true);
-              final r = await widget.gateway.chargeCard(amount: widget.amount);
-              if (context.mounted) Navigator.pop(context, r);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TransferCheckout extends StatefulWidget {
-  const _TransferCheckout({required this.amount, required this.gateway});
-  final int amount;
-  final PaymentGateway gateway;
-
-  @override
-  State<_TransferCheckout> createState() => _TransferCheckoutState();
-}
-
-class _TransferCheckoutState extends State<_TransferCheckout> {
-  TransferAccount? _account;
-  bool _confirming = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.gateway
-        .transferAccountFor(amount: widget.amount)
-        .then((a) => mounted ? setState(() => _account = a) : null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final a = _account;
-    Widget line(String label, String value, {bool copy = false}) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Text(label, style: TextStyle(color: AppColors.textSecondary)),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
-          if (copy)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.copy, size: 16),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: value));
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('$value copied')));
-              },
-            ),
-        ],
-      ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SheetHeader(amount: widget.amount, title: 'Pay with bank transfer'),
-          const SizedBox(height: 12),
-          if (a == null)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-            )
-          else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                children: [
-                  line('Bank', a.bank),
-                  line('Account number', a.accountNumber, copy: true),
-                  line('Account name', a.accountName),
-                  line('Amount', naira(widget.amount), copy: true),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'This account number is for this payment only and expires in 30 minutes.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 18),
-            AppButton(
-              label: _confirming
-                  ? 'Confirming your transfer...'
-                  : 'I\'ve sent the money',
-              loading: _confirming,
-              onPressed: () async {
-                setState(() => _confirming = true);
-                final r = await widget.gateway.confirmTransfer(
-                  amount: widget.amount,
-                );
-                if (context.mounted) Navigator.pop(context, r);
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _UssdCheckout extends StatefulWidget {
-  const _UssdCheckout({required this.amount, required this.gateway});
-  final int amount;
-  final PaymentGateway gateway;
-
-  @override
-  State<_UssdCheckout> createState() => _UssdCheckoutState();
-}
-
-class _UssdCheckoutState extends State<_UssdCheckout> {
-  static const _banks = [
-    ('GTBank', '737'),
-    ('Access Bank', '901'),
-    ('Zenith Bank', '966'),
-    ('UBA', '919'),
-    ('First Bank', '894'),
-  ];
-  int _bank = 0;
-  bool _busy = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final code = widget.gateway.ussdCodeFor(
-      bankCode: _banks[_bank].$2,
-      amount: widget.amount,
-    );
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SheetHeader(amount: widget.amount, title: 'Pay with USSD'),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (var i = 0; i < _banks.length; i++)
-                ChoiceChip(
-                  label: Text(_banks[i].$1),
-                  selected: _bank == i,
-                  showCheckmark: false,
-                  selectedColor: AppColors.primaryLight,
-                  onSelected: (_) => setState(() => _bank = i),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.fieldFill,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  'Dial this code on the phone linked to your bank account',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 10),
-                SelectableText(
-                  code,
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          AppButton(
-            label: 'I\'ve completed the payment',
-            loading: _busy,
-            onPressed: () async {
-              setState(() => _busy = true);
-              final r = await widget.gateway.confirmTransfer(
-                amount: widget.amount,
-              );
-              if (context.mounted) Navigator.pop(context, r);
-            },
-          ),
-        ],
       ),
     );
   }

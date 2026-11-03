@@ -411,6 +411,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                 ),
+                const PushPromptCard(
+                  app: 'driver',
+                  message: 'Get ride requests and payment alerts',
+                ),
                 _BottomPanel(
                   online: d.online,
                   searching: d.searching,
@@ -418,7 +422,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   tripsToday: tripsToday,
                   onlineFor: onlineFor + Duration(minutes: minutesBefore),
                   acceptance: d.acceptanceRate,
-                  quest: earnings.weeklyQuest,
+                  quest: earnings.power.enabled
+                      ? earnings.powerDay
+                      : earnings.weeklyQuest,
                   onToggle: _toggleOnline,
                   onPrefs: () => context.push(Routes.tripPreferences),
                   onRequestNow: () =>
@@ -629,8 +635,10 @@ class _BottomPanel extends StatelessWidget {
                       children: [
                         Text(
                           quest.completed
-                              ? 'Weekly quest done: ${naira(quest.reward)} earned'
-                              : '${quest.target - quest.done} trips to a ${naira(quest.reward)} bonus',
+                              ? quest.doneText ??
+                                    'Weekly quest done: ${naira(quest.reward)} earned'
+                              : quest.todoText ??
+                                    '${quest.target - quest.done} trips to a ${naira(quest.reward)} bonus',
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,

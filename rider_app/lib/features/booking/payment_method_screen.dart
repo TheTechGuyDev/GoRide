@@ -32,13 +32,9 @@ class _PaymentMethodScreenState extends ConsumerState<PaymentMethodScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Adding cards (via Paystack) is enabled with the backend',
-                ),
-              ),
-            ),
+            tooltip: 'Add a card',
+            onPressed: () =>
+                ref.read(paymentMethodsProvider.notifier).addCard(context),
           ),
         ],
       ),

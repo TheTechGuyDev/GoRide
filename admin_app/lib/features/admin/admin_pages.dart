@@ -7,7 +7,6 @@ import '../../core/theme/admin_theme.dart';
 import '../../core/widgets/ui.dart';
 import '../../data/models.dart';
 import '../../data/store.dart';
-import '../finance/finance_pages.dart';
 import '../overview/overview_page.dart';
 
 // ---------------- Staff & roles ----------------
@@ -940,8 +939,6 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        const PaystackPanel(),
       ],
     );
   }

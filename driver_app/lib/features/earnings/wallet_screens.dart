@@ -472,39 +472,22 @@ class _SettleScreenState extends ConsumerState<SettleScreen> {
   late final TextEditingController _amount = TextEditingController(
     text: widget.suggested?.toString() ?? '',
   );
-  final _gateway = SimulatedPaystack();
   bool _busy = false;
 
   int get _value => int.tryParse(_amount.text) ?? 0;
 
   Future<void> _pay() async {
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Top-up coming soon'),
-        content: const Text(
-          'Wallet top-ups go live as soon as Paystack is connected. For now, an admin can add money to your wallet from the GoRide dashboard.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-    if (_gateway.isTestMode) return;
+    if (_value < 100) return;
     setState(() => _busy = true);
-    final res = await _gateway.chargeCard(amount: _value);
+    final reference = await PaystackCheckout.pay(
+      context,
+      amount: _value,
+      purpose: 'settle',
+    );
     if (!mounted) return;
     setState(() => _busy = false);
-    if (!res.success) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(res.message ?? 'Payment failed')));
-      return;
-    }
-    ref.read(earningsProvider.notifier).topUp(_value, res.reference!);
+    if (reference == null) return;
+    ref.read(earningsProvider.notifier).topUp(_value, reference);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${naira(_value)} added to your wallet')),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/models.dart';
 import 'admin/admin_pages.dart';
+import 'admin/integrations_page.dart';
 import 'care/care_pages.dart';
 import 'drivers/drivers_pages.dart';
 import 'finance/finance_pages.dart';
@@ -28,4 +29,5 @@ Widget pageFor(Section s) => switch (s) {
   Section.staff => const StaffPage(),
   Section.settings => const SettingsPage(),
   Section.audit => const AuditPage(),
+  Section.integrations => const IntegrationsPage(),
 };

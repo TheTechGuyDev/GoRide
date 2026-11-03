@@ -28,6 +28,7 @@ class R {
   static const staff = '/staff';
   static const settings = '/settings';
   static const audit = '/audit';
+  static const integrations = '/integrations';
 
   static String of(Section s) => switch (s) {
     Section.overview => overview,
@@ -46,6 +47,7 @@ class R {
     Section.staff => staff,
     Section.settings => settings,
     Section.audit => audit,
+    Section.integrations => integrations,
   };
 
   static Section? sectionFor(String path) {

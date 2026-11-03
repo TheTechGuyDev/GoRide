@@ -26,6 +26,7 @@ export 'src/models/lagos_places.dart';
 
 export 'src/backend/backend.dart';
 export 'src/backend/session.dart';
+export 'src/backend/paystack_checkout.dart';
 
 export 'package:supabase_flutter/supabase_flutter.dart'
     show
@@ -42,4 +43,5 @@ export 'package:supabase_flutter/supabase_flutter.dart'
         PostgresChangeFilterType,
         Session,
         FileOptions,
+        FunctionException,
         User;

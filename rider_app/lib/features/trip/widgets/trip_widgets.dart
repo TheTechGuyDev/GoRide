@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../trip_models.dart';
 
-/// Initials avatar (no stock photos of real people).
+/// The driver's photo, or their initials if they have not added one.
 class DriverAvatar extends StatelessWidget {
   const DriverAvatar({super.key, required this.driver, this.radius = 24});
 
@@ -15,15 +15,32 @@ class DriverAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final url = driver.photoUrl;
+    final initials = Text(
+      driver.initials,
+      style: TextStyle(
+        fontSize: radius * 0.75,
+        fontWeight: FontWeight.w700,
+        color: const Color(0xFF3F51B5),
+      ),
+    );
+    if (url == null || url.isEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: const Color(0xFFDCE7FF),
+        child: initials,
+      );
+    }
     return CircleAvatar(
       radius: radius,
       backgroundColor: const Color(0xFFDCE7FF),
-      child: Text(
-        driver.initials,
-        style: TextStyle(
-          fontSize: radius * 0.75,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF3F51B5),
+      child: ClipOval(
+        child: Image.network(
+          url,
+          width: radius * 2,
+          height: radius * 2,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => initials,
         ),
       ),
     );

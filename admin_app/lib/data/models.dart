@@ -22,6 +22,7 @@ enum Section {
   broadcasts('Notifications', Icons.campaign_outlined),
   staff('Staff & roles', Icons.admin_panel_settings_outlined),
   settings('Settings', Icons.settings_outlined),
+  integrations('Integrations & API keys', Icons.vpn_key_outlined),
   audit('Audit log', Icons.history);
 
   const Section(this.label, this.icon);
@@ -54,6 +55,7 @@ enum AdminRole {
     },
     AdminRole.finance => {
       Section.overview,
+      Section.integrations,
       Section.revenue,
       Section.payouts,
       Section.pricing,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:goride_core/goride_core.dart';
 
+import '../../core/widgets/rider_avatar.dart';
+
 import '../../core/widgets/common.dart';
 import '../driving/driver_controller.dart';
 import '../../core/router/app_router.dart';
@@ -169,14 +171,7 @@ class RequestCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppColors.fieldFill,
-                child: Text(
-                  r.riderName[0],
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
+              RiderAvatar(request: r, radius: 18),
               const SizedBox(width: 10),
               Text(
                 r.riderFirstName,

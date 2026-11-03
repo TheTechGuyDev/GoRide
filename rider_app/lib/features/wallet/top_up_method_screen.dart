@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:goride_core/goride_core.dart' show PaystackCheckout;
 
 import '../../core/services/payment_gateway.dart';
 import '../../core/theme/app_colors.dart';
@@ -80,70 +81,17 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
     TopUpMethod.ussd => 'USSD',
   };
 
+  /// Paystack's secure page handles card, bank transfer and USSD; the
+  /// server credits the wallet once Paystack confirms.
   Future<void> _confirm() async {
-    final gateway = ref.read(paymentGatewayProvider);
-    if (gateway is SimulatedPaystack) {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Top-up coming soon'),
-          content: const Text(
-            'Wallet top-ups go live as soon as Paystack is connected. For now, an admin can add money to your wallet from the GoRide dashboard.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-    TopUpResult? result;
-
-    switch (_method) {
-      case TopUpMethod.savedCard:
-        setState(() => _busy = true);
-        result = await gateway.chargeCard(
-          amount: widget.amount,
-          savedCardId: 'card-4679',
-        );
-      case TopUpMethod.newCard:
-        result = await showModalBottomSheet<TopUpResult>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: AppColors.surface,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          builder: (_) =>
-              _CardCheckout(amount: widget.amount, gateway: gateway),
-        );
-      case TopUpMethod.transfer:
-        result = await showModalBottomSheet<TopUpResult>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: AppColors.surface,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          builder: (_) =>
-              _TransferCheckout(amount: widget.amount, gateway: gateway),
-        );
-      case TopUpMethod.ussd:
-        result = await showModalBottomSheet<TopUpResult>(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: AppColors.surface,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          builder: (_) =>
-              _UssdCheckout(amount: widget.amount, gateway: gateway),
-        );
-    }
-
+    setState(() => _busy = true);
+    final reference = await PaystackCheckout.pay(
+      context,
+      amount: widget.amount,
+    );
+    final result = reference == null
+        ? null
+        : TopUpResult(success: true, reference: reference);
     if (!mounted) return;
     setState(() => _busy = false);
     if (result == null || !result.success) {

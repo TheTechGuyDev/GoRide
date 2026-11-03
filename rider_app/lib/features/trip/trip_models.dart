@@ -16,10 +16,14 @@ class Driver {
     required this.carModel,
     required this.carColor,
     required this.plate,
+    this.photoUrl,
   });
 
   final String id;
   final String name;
+
+  /// The driver's profile photo (public link), if they added one.
+  final String? photoUrl;
 
   /// Riders never see the driver's real number; calls go through GoRide.
   final String maskedPhone;
@@ -59,6 +63,7 @@ class Driver {
       carModel: '${j['make'] ?? ''} ${j['model'] ?? ''}'.trim(),
       carColor: (j['color'] as String?) ?? '',
       plate: (j['plate'] as String?) ?? '',
+      photoUrl: j['avatar_url'] as String?,
     );
   }
 }

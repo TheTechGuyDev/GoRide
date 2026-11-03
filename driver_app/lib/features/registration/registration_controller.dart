@@ -474,7 +474,8 @@ class RegistrationController extends Notifier<RegistrationState> {
               contentType: 'image/jpeg',
             ),
           );
-      avatar = Backend.db.storage.from('avatars').getPublicUrl(path);
+      avatar =
+          '${Backend.db.storage.from('avatars').getPublicUrl(path)}?v=${DateTime.now().millisecondsSinceEpoch}';
     }
     await Backend.db
         .from('profiles')

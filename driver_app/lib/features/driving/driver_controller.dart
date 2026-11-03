@@ -30,6 +30,7 @@ class RideRequest {
     required this.pin,
     this.surge = 1.0,
     this.pickupNote,
+    this.riderPhotoUrl,
   });
 
   final String id;
@@ -48,6 +49,9 @@ class RideRequest {
   final String pin;
   final double surge;
   final String? pickupNote;
+
+  /// The rider's profile photo (public link), if they added one.
+  final String? riderPhotoUrl;
 
   String get riderFirstName => riderName.split(' ').first;
 }
@@ -546,6 +550,7 @@ class DriverController extends Notifier<DriverState> {
       fare: (r['fare'] as num).toInt(),
       pin: '',
       surge: (r['surge'] as num?)?.toDouble() ?? 1,
+      riderPhotoUrl: rider?['avatar_url'] as String?,
     );
   }
 }

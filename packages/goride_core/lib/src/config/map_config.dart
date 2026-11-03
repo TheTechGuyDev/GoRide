@@ -1,3 +1,4 @@
+import '../backend/backend.dart';
 import 'package:latlong2/latlong.dart';
 
 /// Free map configuration. No API keys needed.
@@ -7,7 +8,11 @@ class MapConfig {
   /// OpenStreetMap tiles (free, community-run).
   /// For production traffic, switch to a self-hosted or other free tile
   /// server here; nothing else in the app needs to change.
-  static const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  static const osmTileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+  /// Map style: OpenStreetMap unless a map tile URL is set in the admin
+  /// dashboard > Integrations (e.g. MapTiler or Mapbox).
+  static String get tileUrl => Backend.config['map_tile_url'] ?? osmTileUrl;
   static const userAgent = 'com.goride.goride_rider';
   static const attribution = 'OpenStreetMap contributors';
 

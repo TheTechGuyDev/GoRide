@@ -6,6 +6,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:goride_core/goride_core.dart';
+
+import '../../core/widgets/rider_avatar.dart';
+
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -461,18 +464,7 @@ class _TripPanel extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: AppColors.primaryLight,
-                child: Text(
-                  r.riderName[0],
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
+              RiderAvatar(request: r, radius: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

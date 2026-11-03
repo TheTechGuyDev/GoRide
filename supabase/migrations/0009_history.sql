@@ -4,7 +4,7 @@ language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(x order by x->>'requested_at' desc), '[]'::jsonb) from (
     select to_jsonb(t) - 'pin' || jsonb_build_object(
       'driver', case when d.id is null then null else jsonb_build_object(
-        'id', d.id, 'name', p.full_name, 'rating', p.rating,
+        'id', d.id, 'name', p.full_name, 'rating', p.rating, 'avatar_url', p.avatar_url,
         'phone', '+234 *** *** ' || right(coalesce(p.phone, '0000'), 4),
         'trips', (select count(*) from trips z where z.driver_id = d.id and z.status = 'completed'),
         'member_since', coalesce(d.approved_at, d.created_at),

@@ -141,7 +141,7 @@ class EmergencyScreen extends ConsumerWidget {
             ),
           const SizedBox(height: 6),
           Text(
-            'Preview: email and app alerts send for real once the backend (Supabase) is connected. WhatsApp works now.',
+            'The GoRide safety team has been alerted with your live location. Use WhatsApp below to message your contacts straight away.',
             style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),
           const SizedBox(height: 20),

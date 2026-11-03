@@ -163,7 +163,7 @@ class _PhoneScreenState extends ConsumerState<PhoneScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Preview: after you submit your application, tap Approve on the status screen to try driving straight away.',
+                'New drivers are reviewed by the GoRide team, usually within 24 hours.',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.4,

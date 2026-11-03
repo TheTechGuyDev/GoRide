@@ -20,10 +20,24 @@ class Backend {
     if (_ready) return;
     await Supabase.initialize(url: url, publishableKey: publishableKey);
     _ready = true;
-    await loadRideTypes();
+    await Future.wait([loadRideTypes(), loadConfig()]);
   }
 
   static SupabaseClient get db => Supabase.instance.client;
+
+  /// Public settings from the admin dashboard > Integrations
+  /// (e.g. Paystack public key, map style). Never contains secrets.
+  static Map<String, String> config = const {};
+
+  static Future<void> loadConfig() async {
+    try {
+      final j = await db.rpc('public_config');
+      config = {
+        for (final e in (j as Map).entries)
+          if (e.value != null) e.key as String: e.value.toString(),
+      };
+    } catch (_) {}
+  }
   static GoTrueClient get auth => db.auth;
   static User? get user => _ready ? auth.currentUser : null;
   static bool get signedIn => user != null;

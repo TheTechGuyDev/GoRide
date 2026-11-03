@@ -21,8 +21,23 @@ class SosController extends Notifier<DateTime?> {
   @override
   DateTime? build() => null;
 
+  /// Alerts the GoRide safety team (admin Safety page) with the driver's
+  /// position and current trip.
   void trigger() {
     state = DateTime.now();
+    final pos = ref.read(driverProvider).position;
+    Backend.db
+        .rpc(
+          'raise_sos',
+          params: {
+            'p_trip': ref.read(tripProvider)?.request.id,
+            'p_kind': 'sos',
+            'p_lat': pos.latitude,
+            'p_lng': pos.longitude,
+            'p_details': 'Driver pressed SOS',
+          },
+        )
+        .then((_) {}, onError: (_) {});
     ref
         .read(notificationsProvider.notifier)
         .notify(

@@ -17,7 +17,10 @@ const _groups = [
   ),
   ('Safety and care', [Section.safety, Section.support]),
   ('Growth', [Section.promos, Section.broadcasts]),
-  ('Admin', [Section.staff, Section.settings, Section.audit]),
+  (
+    'Admin',
+    [Section.staff, Section.settings, Section.integrations, Section.audit],
+  ),
 ];
 
 class AdminShell extends ConsumerWidget {

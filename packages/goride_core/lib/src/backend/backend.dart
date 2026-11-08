@@ -64,28 +64,59 @@ const tripColumns =
 class AuthService {
   AuthService._();
 
+  /// Login protection on the server: account lockout after 5 wrong codes
+  /// and limits per network. Throws a friendly message when blocked.
+  static Future<void> _guard(String action, String email, {bool? ok}) async {
+    Map<String, dynamic>? res;
+    try {
+      final r = await Backend.db.functions.invoke(
+        'auth-guard',
+        body: {'action': action, 'email': email, 'ok': ?ok},
+      );
+      res = r.data is Map ? Map<String, dynamic>.from(r.data as Map) : null;
+    } catch (_) {
+      return; // if the guard is unreachable, Supabase's own limits still apply
+    }
+    if (res != null && res['ok'] == false) {
+      throw AuthException(res['message']?.toString() ?? 'Please try later.');
+    }
+  }
+
   /// Sends a 6-digit code. [createUser] false makes sign-in fail for unknown emails.
   static Future<void> sendCode(
     String email, {
     required bool createUser,
     Map<String, dynamic>? data,
-  }) => Backend.auth.signInWithOtp(
-    email: email.trim().toLowerCase(),
-    shouldCreateUser: createUser,
-    data: data,
-  );
+  }) async {
+    final e = email.trim().toLowerCase();
+    await _guard('can_send', e);
+    await Backend.auth.signInWithOtp(
+      email: e,
+      shouldCreateUser: createUser,
+      data: data,
+    );
+    _guard('sent', e);
+  }
 
   static Future<User> verifyCode(String email, String code) async {
-    final res = await Backend.auth.verifyOTP(
-      email: email.trim().toLowerCase(),
-      token: code,
-      type: OtpType.email,
-    );
-    final user = res.user;
-    if (user == null) {
-      throw const AuthException('That code did not work. Try again.');
+    final e = email.trim().toLowerCase();
+    await _guard('can_verify', e);
+    try {
+      final res = await Backend.auth.verifyOTP(
+        email: e,
+        token: code,
+        type: OtpType.email,
+      );
+      final user = res.user;
+      if (user == null) {
+        throw const AuthException('That code did not work. Try again.');
+      }
+      _guard('record', e, ok: true);
+      return user;
+    } on AuthException {
+      await _guard('record', e, ok: false);
+      rethrow;
     }
-    return user;
   }
 
   /// Opens Google. On web the page reloads signed in; the app picks the

@@ -736,6 +736,7 @@ class AdminStore extends Notifier<AdminData> {
             'rider_referral_reward': s.referralRiderReward,
             'driver_referral_reward': s.referralDriverReward,
             'maintenance_mode': s.maintenanceMode,
+            'demo_drive_allowed': s.demoDriveAllowed,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', 1),

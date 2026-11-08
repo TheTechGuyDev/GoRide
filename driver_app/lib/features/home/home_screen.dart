@@ -689,6 +689,9 @@ class _BottomPanel extends StatelessWidget {
             Consumer(
               builder: (context, ref, _) {
                 final demo = ref.watch(demoDriveProvider);
+                final allowed =
+                    ref.watch(demoDriveAllowedProvider).value ?? false;
+                if (!allowed && !demo) return const SizedBox.shrink();
                 return TextButton(
                   onPressed: () =>
                       ref.read(demoDriveProvider.notifier).set(!demo),

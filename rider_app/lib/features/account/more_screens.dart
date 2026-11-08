@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:goride_core/goride_core.dart' show confirmDeleteAccount;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -684,6 +685,15 @@ Future<void> confirmLogout(BuildContext context, WidgetRef ref) async {
     ),
   );
   if (ok != true || !context.mounted) return;
+  ref.read(tripControllerProvider.notifier).clear();
+  await ref.read(authControllerProvider.notifier).signOut();
+  ref.invalidate(authControllerProvider);
+  if (context.mounted) context.go(Routes.welcome);
+}
+
+/// Google Play rule: users can delete their account inside the app.
+Future<void> deleteAccount(BuildContext context, WidgetRef ref) async {
+  if (!await confirmDeleteAccount(context)) return;
   ref.read(tripControllerProvider.notifier).clear();
   await ref.read(authControllerProvider.notifier).signOut();
   ref.invalidate(authControllerProvider);

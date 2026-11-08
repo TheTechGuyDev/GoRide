@@ -179,6 +179,20 @@ final demoDriveProvider = NotifierProvider<DemoDriveController, bool>(
   DemoDriveController.new,
 );
 
+/// The admin decides (Admin > Settings) whether drivers see demo drive.
+final demoDriveAllowedProvider = FutureProvider<bool>((ref) async {
+  try {
+    final r = await Backend.db
+        .from('app_settings')
+        .select('demo_drive_allowed')
+        .eq('id', 1)
+        .maybeSingle();
+    return r?['demo_drive_allowed'] == true;
+  } catch (_) {
+    return false;
+  }
+});
+
 class DriverController extends Notifier<DriverState> {
   static const requestSeconds = 15;
 

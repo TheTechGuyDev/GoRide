@@ -302,7 +302,7 @@ class NotificationsController extends Notifier<List<AppNotification>> {
             category: n.urgent
                 ? AndroidNotificationCategory.alarm
                 : AndroidNotificationCategory.status,
-            fullScreenIntent: n.urgent,
+            fullScreenIntent: false,
             color: AppColors.primary,
           ),
           iOS: DarwinNotificationDetails(

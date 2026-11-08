@@ -939,6 +939,28 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        Panel(
+          title: 'Testing',
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: s.demoDriveAllowed,
+            onChanged: (v) => store.saveSettings(
+              s.copyWith(demoDriveAllowed: v),
+              v ? 'Demo drive turned on for drivers' : 'Demo drive turned off',
+            ),
+            title: const Text(
+              'Demo drive in the driver app',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              s.demoDriveAllowed
+                  ? 'Drivers see a button that makes the car drive itself (for testing with one phone)'
+                  : 'Hidden. Drivers always use real GPS',
+              style: TextStyle(color: AC.muted, fontSize: 12.5),
+            ),
+          ),
+        ),
       ],
     );
   }

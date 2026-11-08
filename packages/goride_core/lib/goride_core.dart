@@ -28,6 +28,7 @@ export 'src/backend/backend.dart';
 export 'src/backend/session.dart';
 export 'src/backend/paystack_checkout.dart';
 export 'src/backend/push_service.dart';
+export 'src/backend/delete_account.dart';
 
 export 'package:supabase_flutter/supabase_flutter.dart'
     show

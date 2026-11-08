@@ -8,6 +8,7 @@ on:
       - 'driver_app/**'
       - 'admin_app/**'
       - 'packages/**'
+      - 'website/**'
       - '.github/workflows/deploy-rider-web.yml'
   workflow_dispatch:
 
@@ -59,6 +60,8 @@ jobs:
           cp -r driver_app/build/web/. site/driver/
           mkdir -p site/admin
           cp -r admin_app/build/web/. site/admin/
+          # Website pages (privacy, terms, account deletion)
+          cp -r website/. site/
 
       - uses: actions/upload-pages-artifact@v3
         with:

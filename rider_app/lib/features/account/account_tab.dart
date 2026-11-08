@@ -178,10 +178,17 @@ class AccountTab extends ConsumerWidget {
                 danger: true,
                 onTap: (c) => confirmLogout(c, ref),
               ),
+              _Item(
+                Icons.delete_forever_outlined,
+                'Delete my account',
+                null,
+                danger: true,
+                onTap: (c) => deleteAccount(c, ref),
+              ),
             ],
           ),
           Text(
-            'GoRide 1.0.0 (preview)',
+            'GoRide 1.0.0',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: AppColors.textHint),
           ),

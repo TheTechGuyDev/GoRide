@@ -352,6 +352,7 @@ Snapshot parseSnapshot(Map<String, dynamic> j, AdminData base) {
     referralRiderReward: _i(st['rider_referral_reward']),
     referralDriverReward: _i(st['driver_referral_reward']),
     maintenanceMode: st['maintenance_mode'] == true,
+    demoDriveAllowed: st['demo_drive_allowed'] == true,
   );
 
   return Snapshot(

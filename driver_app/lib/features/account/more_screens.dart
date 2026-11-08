@@ -626,3 +626,13 @@ Future<void> confirmLogout(BuildContext context, WidgetRef ref) async {
   await ref.read(authControllerProvider.notifier).signOut();
   if (context.mounted) context.go(Routes.welcome);
 }
+
+/// Google Play rule: users can delete their account inside the app.
+Future<void> deleteAccount(BuildContext context, WidgetRef ref) async {
+  ref.read(driverProvider.notifier).goOffline();
+  if (!await confirmDeleteAccount(context)) return;
+  ref.read(registrationProvider.notifier).reset();
+  ref.read(earningsProvider.notifier).reset();
+  await ref.read(authControllerProvider.notifier).signOut();
+  if (context.mounted) context.go(Routes.welcome);
+}

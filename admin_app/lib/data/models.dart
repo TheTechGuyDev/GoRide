@@ -769,6 +769,7 @@ class AppSettings {
     this.referralRiderReward = 500,
     this.referralDriverReward = 5000,
     this.maintenanceMode = false,
+    this.demoDriveAllowed = false,
   });
 
   final int commissionRate;
@@ -789,6 +790,9 @@ class AppSettings {
   final int referralDriverReward;
   final bool maintenanceMode;
 
+  /// Lets drivers use demo drive (the car drives itself) for testing.
+  final bool demoDriveAllowed;
+
   AppSettings copyWith({
     int? commissionRate,
     int? debtLimit,
@@ -807,6 +811,7 @@ class AppSettings {
     int? referralRiderReward,
     int? referralDriverReward,
     bool? maintenanceMode,
+    bool? demoDriveAllowed,
   }) {
     return AppSettings(
       commissionRate: commissionRate ?? this.commissionRate,
@@ -828,6 +833,7 @@ class AppSettings {
       referralRiderReward: referralRiderReward ?? this.referralRiderReward,
       referralDriverReward: referralDriverReward ?? this.referralDriverReward,
       maintenanceMode: maintenanceMode ?? this.maintenanceMode,
+      demoDriveAllowed: demoDriveAllowed ?? this.demoDriveAllowed,
     );
   }
 }

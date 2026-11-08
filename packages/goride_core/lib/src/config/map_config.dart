@@ -15,7 +15,11 @@ class MapConfig {
   /// dashboard > Integrations (e.g. MapTiler or Mapbox).
   static String get tileUrl => Backend.config['map_tile_url'] ?? osmTileUrl;
   static const userAgent = 'com.goride.goride_rider';
-  static const attribution = 'OpenStreetMap contributors';
+
+  /// Credit line the map provider requires.
+  static String get attribution => tileUrl.contains('maptiler.com')
+      ? '© MapTiler © OpenStreetMap contributors'
+      : 'OpenStreetMap contributors';
 
   /// Fallback when location is off: Victoria Island, Lagos.
   static const defaultCenter = LatLng(6.4281, 3.4219);

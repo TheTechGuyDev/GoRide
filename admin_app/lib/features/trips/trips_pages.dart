@@ -920,7 +920,7 @@ class _LiveMapPageState extends ConsumerState<LiveMapPage> {
                 ),
             ],
           ),
-          const SimpleAttributionWidget(source: Text(MapConfig.attribution)),
+          SimpleAttributionWidget(source: Text(MapConfig.attribution)),
         ],
       ),
     );

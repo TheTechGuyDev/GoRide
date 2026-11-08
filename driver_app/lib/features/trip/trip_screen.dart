@@ -256,7 +256,7 @@ class _TripScreenState extends ConsumerState<TripScreen> {
                   },
                 ),
               ),
-              const SimpleAttributionWidget(
+              SimpleAttributionWidget(
                 source: Text(MapConfig.attribution),
                 alignment: Alignment.topRight,
               ),

@@ -225,7 +225,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
                           ? darkModeTileBuilder
                           : null,
                     ),
-                    const SimpleAttributionWidget(
+                    SimpleAttributionWidget(
                       source: Text(MapConfig.attribution),
                       alignment: Alignment.bottomLeft,
                     ),

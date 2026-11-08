@@ -133,7 +133,7 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                   ),
                 ],
               ),
-            const SimpleAttributionWidget(
+            SimpleAttributionWidget(
               source: Text(MapConfig.attribution),
               alignment: Alignment.bottomLeft,
             ),

@@ -256,7 +256,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         type: _markerType(kind),
                       ),
               ),
-              const SimpleAttributionWidget(
+              SimpleAttributionWidget(
                 source: Text(MapConfig.attribution),
                 alignment: Alignment.bottomLeft,
               ),

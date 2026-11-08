@@ -289,6 +289,8 @@ class AdminStore extends Notifier<AdminData> {
 
   Future<void> load() async {
     if (ref.read(sessionProvider) == null) return;
+    // Signed out (or the session is being refreshed): skip this round.
+    if (Backend.db.auth.currentSession == null) return;
     try {
       final j = await Backend.db.rpc('admin_snapshot');
       final snap = parseSnapshot(Map<String, dynamic>.from(j as Map), state);

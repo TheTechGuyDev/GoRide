@@ -32,6 +32,16 @@
     <div class="bar"></div>
     <div>GoRide Admin</div>
   </div>
+  <script>
+    // Keep this app's sign-in separate from the other GoRide apps on this site.
+    (function () {
+      var B = window.BroadcastChannel;
+      if (!B) return;
+      function Scoped(name) { return new B(name + '-goride-admin'); }
+      Scoped.prototype = B.prototype;
+      window.BroadcastChannel = Scoped;
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

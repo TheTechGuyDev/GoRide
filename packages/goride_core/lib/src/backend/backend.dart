@@ -16,9 +16,20 @@ class Backend {
   static bool _ready = false;
   static bool get ready => _ready;
 
-  static Future<void> init() async {
+  /// [sessionKey] keeps each app's sign-in separate. All three web apps
+  /// live on the same website, so without it signing in or out of one app
+  /// (in another tab) would replace the session of the others.
+  static Future<void> init({String? sessionKey}) async {
     if (_ready) return;
-    await Supabase.initialize(url: url, publishableKey: publishableKey);
+    await Supabase.initialize(
+      url: url,
+      publishableKey: publishableKey,
+      authOptions: FlutterAuthClientOptions(
+        localStorage: sessionKey == null
+            ? null
+            : SharedPreferencesLocalStorage(persistSessionKey: sessionKey),
+      ),
+    );
     _ready = true;
     await Future.wait([loadRideTypes(), loadConfig()]);
   }

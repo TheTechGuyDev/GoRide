@@ -10,7 +10,7 @@ import 'features/home/request_card.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Backend.init();
+  await Backend.init(sessionKey: 'sb-goride-driver-auth');
   runApp(const ProviderScope(child: GoRideDriverApp()));
 }
 

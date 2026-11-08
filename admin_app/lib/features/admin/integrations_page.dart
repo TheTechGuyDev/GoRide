@@ -154,6 +154,26 @@ const _services = [
     ],
   ),
   _Service(
+    title: 'Firebase (push notifications on Android)',
+    icon: Icons.notifications_active_outlined,
+    what: 'Lets the Android apps get trip and payment alerts even when the app is closed. Free. The web apps already have push without this.',
+    fields: [
+      _Field(
+        'firebase_service_account',
+        'Service account key (JSON)',
+        secret: true,
+        hint: 'Paste the whole contents of the downloaded .json file',
+      ),
+    ],
+    steps: [
+      'Go to console.firebase.google.com and click "Create a project". Name it GoRide (turn off Google Analytics, not needed).',
+      'Click the Android icon to add an app. Package name: com.goride.goride_rider. Download google-services.json and send it to your developer.',
+      'Add a second Android app with package name com.goride.goride_driver and download its google-services.json too.',
+      'Click the gear icon (Project settings), then the "Service accounts" tab, then "Generate new private key". A .json file downloads.',
+      'Open that file, copy everything in it and paste it below. Keep the file private: it is a password.',
+    ],
+  ),
+  _Service(
     title: 'Map style',
     icon: Icons.map_outlined,
     what: 'GoRide uses free OpenStreetMap maps by default, so nothing is needed. Add a map style link only if you want faster or nicer maps from a provider such as MapTiler or Mapbox.',

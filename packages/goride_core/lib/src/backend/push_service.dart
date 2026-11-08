@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -11,15 +14,73 @@ import 'push_js_stub.dart' if (dart.library.js_interop) 'push_js_web.dart';
 class PushService {
   PushService._();
 
+  static bool get _android =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  static bool _firebaseReady = false;
+
+  /// Android apps: Firebase is set up from google-services.json in the build.
+  static Future<bool> _initFirebase() async {
+    if (_firebaseReady) return true;
+    try {
+      await Firebase.initializeApp();
+      _firebaseReady = true;
+    } catch (_) {}
+    return _firebaseReady;
+  }
+
   /// 'default' (not asked yet), 'granted', 'denied' or 'unsupported'.
-  static String get permission => pushPermission();
+  static String get permission => _android ? _androidPerm : pushPermission();
+  static String _androidPerm = 'unsupported';
+
+  /// Works out the Android permission state (call once at start).
+  static Future<String> checkPermission() async {
+    if (!_android) return pushPermission();
+    if (!await _initFirebase()) return _androidPerm = 'unsupported';
+    final st = await FirebaseMessaging.instance.getNotificationSettings();
+    return _androidPerm = switch (st.authorizationStatus) {
+      AuthorizationStatus.authorized ||
+      AuthorizationStatus.provisional => 'granted',
+      AuthorizationStatus.denied => 'denied',
+      _ => 'default',
+    };
+  }
+
+  static Future<bool> _enableAndroid(String app, bool ask, String uid) async {
+    if (!await _initFirebase()) return false;
+    final fm = FirebaseMessaging.instance;
+    if (ask) await fm.requestPermission();
+    if (await checkPermission() != 'granted') return false;
+    // ignore: deprecated_member_use
+    final token = await fm.getToken();
+    if (token == null) return false;
+    Future<void> save(String t) =>
+        Backend.db.from('push_subscriptions').upsert({
+          'endpoint': 'fcm:$t',
+          'user_id': uid,
+          'p256dh': '-',
+          'auth': '-',
+          'app': app,
+        });
+    await save(token);
+    // ignore: deprecated_member_use
+    fm.onTokenRefresh.listen((t) => save(t).catchError((_) {}));
+    return true;
+  }
 
   /// Subscribes this device. With [ask] false it only refreshes an existing
   /// permission (no popup). Returns true when push is on.
   static Future<bool> enable({required String app, bool ask = true}) async {
     final key = Backend.config['vapid_public_key'];
     final uid = Backend.user?.id;
-    if (key == null || uid == null) return false;
+    if (uid == null) return false;
+    if (_android) {
+      try {
+        return await _enableAndroid(app, ask, uid);
+      } catch (_) {
+        return false;
+      }
+    }
+    if (key == null) return false;
     try {
       final raw = await pushSubscribe(key, ask);
       if (raw.isEmpty) return false;
@@ -58,8 +119,11 @@ class _PushPromptCardState extends State<PushPromptCard> {
   @override
   void initState() {
     super.initState();
-    // Already allowed: keep this device subscribed silently.
-    if (_perm == 'granted') PushService.enable(app: widget.app, ask: false);
+    PushService.checkPermission().then((p) {
+      if (mounted) setState(() => _perm = p);
+      // Already allowed: keep this device subscribed silently.
+      if (p == 'granted') PushService.enable(app: widget.app, ask: false);
+    });
   }
 
   @override

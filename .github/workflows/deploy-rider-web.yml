@@ -31,12 +31,12 @@ jobs:
           channel: stable
           cache: true
 
-      # Rider app at /GoRide/
+      # Rider app at /GoRide/ride/ (the website is at /GoRide/)
       - name: Build rider app
         working-directory: rider_app
         run: |
           flutter pub get
-          flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/"
+          flutter build web --release --no-web-resources-cdn --base-href "/${{ github.event.repository.name }}/ride/"
 
       # Driver app at /GoRide/driver/
       - name: Build driver app
@@ -54,13 +54,13 @@ jobs:
 
       - name: Combine sites
         run: |
-          mkdir -p site
-          cp -r rider_app/build/web/. site/
+          mkdir -p site/ride
+          cp -r rider_app/build/web/. site/ride/
           mkdir -p site/driver
           cp -r driver_app/build/web/. site/driver/
           mkdir -p site/admin
           cp -r admin_app/build/web/. site/admin/
-          # Website pages (privacy, terms, account deletion)
+          # Website: landing page, privacy, terms, account deletion
           cp -r website/. site/
 
       - uses: actions/upload-pages-artifact@v3

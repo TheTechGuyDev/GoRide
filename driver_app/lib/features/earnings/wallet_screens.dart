@@ -570,7 +570,10 @@ class _SettleScreenState extends ConsumerState<SettleScreen> {
       ),
       bottomNavigationBar: BottomActionBar(
         child: AppButton(
-          label: _value > 0 ? 'Pay ${naira(_value)}' : 'Pay',
+          // The driver pays the Paystack fee on top, so the full amount clears.
+          label: _value > 0
+              ? 'Pay ${naira(_value + paystackFee(_value))} (incl. ${naira(paystackFee(_value))} Paystack fee)'
+              : 'Pay',
           loading: _busy,
           onPressed: _value >= 100 ? _pay : null,
         ),

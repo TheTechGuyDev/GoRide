@@ -13,6 +13,15 @@ import 'backend.dart';
 /// The app asks the `paystack` server function to start a payment (the
 /// secret key stays on the server), opens Paystack's secure page, then checks
 /// with the server until Paystack confirms. The server credits the wallet.
+/// Paystack's local card fee (1.5% + N100 above N2,500, capped at N2,000).
+/// The payer covers it so the full amount reaches the wallet.
+int paystackFee(int amount) {
+  var gross = (amount / 0.985).ceil();
+  if (gross >= 2500) gross = ((amount + 100) / 0.985).ceil();
+  final fee = gross - amount;
+  return fee > 2000 ? 2000 : fee;
+}
+
 class PaystackCheckout {
   PaystackCheckout._();
 

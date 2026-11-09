@@ -484,3 +484,214 @@ class _EnginePanelState extends State<EnginePanel> {
     );
   }
 }
+
+/// Which ride types can be booked in each city, and when. Closed types
+/// still show in the rider app, greyed out with the reason.
+class RideRulesPanel extends StatefulWidget {
+  const RideRulesPanel({super.key});
+
+  @override
+  State<RideRulesPanel> createState() => _RideRulesPanelState();
+}
+
+class _RideRulesPanelState extends State<RideRulesPanel> {
+  List<String> _cities = [];
+  List<Map<String, dynamic>> _types = [];
+  Map<String, Map<String, dynamic>> _rules = {}; // key: city|type
+  String? _city;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final c = await Backend.db.from('cities').select('name').order('name');
+      final t = await Backend.db
+          .from('ride_types')
+          .select('id, name')
+          .eq('active', true)
+          .order('minimum_fare');
+      final r = await Backend.db.from('city_ride_rules').select();
+      if (!mounted) return;
+      setState(() {
+        _cities = [for (final x in c) x['name'] as String];
+        _types = [for (final x in t) Map<String, dynamic>.from(x)];
+        _rules = {
+          for (final x in r)
+            '${x['city']}|${x['ride_type_id']}': Map<String, dynamic>.from(x),
+        };
+        _city ??= _cities.contains('Ibadan') ? 'Ibadan' : _cities.firstOrNull;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = AuthService.message(e));
+    }
+  }
+
+  Map<String, dynamic> _rule(String type) =>
+      _rules['$_city|$type'] ??
+      {
+        'city': _city,
+        'ride_type_id': type,
+        'enabled': true,
+        'opens': null,
+        'closes': null,
+      };
+
+  Future<void> _save(Map<String, dynamic> row, String done) async {
+    try {
+      await Backend.db.from('city_ride_rules').upsert(row);
+      setState(() => _rules['${row['city']}|${row['ride_type_id']}'] = row);
+      if (mounted) toast(context, done);
+    } catch (e) {
+      if (mounted) toast(context, AuthService.message(e));
+    }
+  }
+
+  TimeOfDay? _parse(Object? v) {
+    if (v is! String || v.length < 5) return null;
+    return TimeOfDay(
+      hour: int.parse(v.substring(0, 2)),
+      minute: int.parse(v.substring(3, 5)),
+    );
+  }
+
+  String _fmt(TimeOfDay t) {
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    return '$h:${t.minute.toString().padLeft(2, '0')}${t.period == DayPeriod.am ? 'am' : 'pm'}';
+  }
+
+  String _db(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _editHours(String type, String name) async {
+    final r = _rule(type);
+    final allDay = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('$name hours in $_city'),
+        content: const Text(
+          'Choose set hours, or let riders book this ride type all day.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('All day'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Set hours'),
+          ),
+        ],
+      ),
+    );
+    if (allDay == null || !mounted) return;
+    if (allDay) {
+      await _save({...r, 'opens': null, 'closes': null}, '$name: all day');
+      return;
+    }
+    final opens = await showTimePicker(
+      context: context,
+      helpText: 'Opens at',
+      initialTime: _parse(r['opens']) ?? const TimeOfDay(hour: 5, minute: 30),
+    );
+    if (opens == null || !mounted) return;
+    final closes = await showTimePicker(
+      context: context,
+      helpText: 'Closes at',
+      initialTime: _parse(r['closes']) ?? const TimeOfDay(hour: 22, minute: 30),
+    );
+    if (closes == null) return;
+    await _save({
+      ...r,
+      'opens': _db(opens),
+      'closes': _db(closes),
+    }, '$name: ${_fmt(opens)} to ${_fmt(closes)}');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Panel(
+      title: 'Ride types by city',
+      subtitle: 'Turn a ride type off or set its hours. Riders see closed types greyed out with the reason.',
+      child: _city == null
+          ? Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                _error ?? 'Loading...',
+                style: TextStyle(color: AC.muted),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final c in _cities)
+                      ChoiceChip(
+                        label: Text(c),
+                        selected: c == _city,
+                        onSelected: (_) => setState(() => _city = c),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                for (final t in _types)
+                  Builder(
+                    builder: (context) {
+                      final id = t['id'] as String, name = t['name'] as String;
+                      final r = _rule(id);
+                      final on = r['enabled'] != false;
+                      final o = _parse(r['opens']), cl = _parse(r['closes']);
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          !on
+                              ? 'Off in $_city'
+                              : (o == null || cl == null)
+                              ? 'All day'
+                              : '${_fmt(o)} to ${_fmt(cl)}',
+                          style: TextStyle(
+                            color: on ? AC.muted : AC.red,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: on ? () => _editHours(id, name) : null,
+                              child: const Text('Hours'),
+                            ),
+                            Switch(
+                              value: on,
+                              onChanged: (v) => _save(
+                                {...r, 'enabled': v},
+                                v
+                                    ? '$name is on in $_city'
+                                    : '$name is off in $_city',
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+    );
+  }
+}

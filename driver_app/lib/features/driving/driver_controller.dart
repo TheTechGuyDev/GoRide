@@ -276,6 +276,17 @@ class DriverController extends Notifier<DriverState> {
     if (ref.read(locationControllerProvider).isFallback) {
       return 'We could not find your location. Turn on Location (GPS) for GoRide Driver in your phone settings, then try again.';
     }
+    // City rules, e.g. no okada at night in Oyo State.
+    try {
+      final here = ref.read(locationControllerProvider).position;
+      final why = await Backend.db.rpc(
+        'my_ride_type_block',
+        params: {'p_lat': here.latitude, 'p_lng': here.longitude},
+      );
+      if (why is String && why.isNotEmpty) {
+        return 'Your vehicle type cannot take trips here right now. $why.';
+      }
+    } catch (_) {}
     syncLocation();
     state = state.copyWith(online: true, onlineSince: DateTime.now());
     _paused = false;

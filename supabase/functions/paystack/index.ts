@@ -32,6 +32,14 @@ async function hmac512(key: string, body: string): Promise<string> {
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Paystack's local card fee: 1.5% + N100 (the N100 waived under N2,500),
+// capped at N2,000. The payer covers it, so the full amount reaches GoRide.
+export function feeFor(amount: number): number {
+  let gross = Math.ceil(amount / 0.985);
+  if (gross >= 2500) gross = Math.ceil((amount + 100) / 0.985);
+  return Math.min(gross - amount, 2000);
+}
+
 // Credit the wallet and remember the card for next time.
 async function credit(data: Record<string, any>) {
   await admin.rpc("credit_paystack", { p_reference: data.reference, p_amount_kobo: data.amount });
@@ -49,14 +57,15 @@ async function chargeSaved(sk: string, userId: string, cardId: string | null, am
   const card = cards?.[0];
   if (!card) return { status: "failed", error: "No saved card" };
   const reference = `GRC-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-  const { error } = await admin.from("paystack_payments").insert({ reference, user_id: userId, amount, purpose });
+  const fee = feeFor(amount);
+  const { error } = await admin.from("paystack_payments").insert({ reference, user_id: userId, amount, purpose, fee });
   if (error) return { status: "failed", error: error.message };
   let email = card.email;
   if (!email) email = (await admin.auth.admin.getUserById(userId)).data.user?.email ?? `${userId}@goride.app`;
   const r = await fetch("https://api.paystack.co/transaction/charge_authorization", {
     method: "POST",
     headers: { Authorization: `Bearer ${sk}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ authorization_code: card.authorization_code, email, amount: amount * 100, reference, currency: "NGN" }),
+    body: JSON.stringify({ authorization_code: card.authorization_code, email, amount: (amount + fee) * 100, reference, currency: "NGN" }),
   });
   const j = await r.json();
   const status = j?.data?.status ?? "failed";
@@ -136,14 +145,15 @@ Deno.serve(async (req) => {
     }
     const purpose = ["settle", "add_card"].includes(String(body.purpose)) ? String(body.purpose) : "top_up";
     const reference = `GR-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
-    const { error } = await admin.from("paystack_payments").insert({ reference, user_id: user.id, amount, purpose });
+    const fee = feeFor(amount);
+    const { error } = await admin.from("paystack_payments").insert({ reference, user_id: user.id, amount, purpose, fee });
     if (error) return json({ error: error.message }, 400);
     const r = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
       headers: { Authorization: `Bearer ${sk}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         email: user.email ?? `${user.id}@goride.app`,
-        amount: amount * 100,
+        amount: (amount + fee) * 100,
         reference,
         currency: "NGN",
         callback_url: typeof body.callback_url === "string" ? body.callback_url : undefined,
@@ -152,7 +162,7 @@ Deno.serve(async (req) => {
     });
     const j = await r.json();
     if (!j?.status) return json({ error: j?.message ?? "Paystack could not start the payment." }, 400);
-    return json({ authorization_url: j.data.authorization_url, reference });
+    return json({ authorization_url: j.data.authorization_url, reference, fee, total: amount + fee });
   }
 
   if (body.action === "verify") {

@@ -309,14 +309,31 @@ class _OptionsPanel extends ConsumerWidget {
                 final type = rideTypes[i];
                 final fare = fareOf(quotes, type, route);
                 final discount = promo?.discountFor(type.id, fare) ?? 0;
+                final why = quotes[type.id]?.unavailable;
+                // The chosen type became unavailable: move to the first open one.
+                if (why != null && type.id == booking.rideTypeId) {
+                  final open = rideTypes.where(
+                    (t) => quotes[t.id]?.unavailable == null,
+                  );
+                  if (open.isNotEmpty) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => ref
+                          .read(bookingControllerProvider.notifier)
+                          .selectRideType(open.first.id),
+                    );
+                  }
+                }
                 return _RideTypeCard(
                   type: type,
                   fare: fare,
                   discount: discount,
-                  selected: type.id == booking.rideTypeId,
-                  onTap: () => ref
-                      .read(bookingControllerProvider.notifier)
-                      .selectRideType(type.id),
+                  unavailable: why,
+                  selected: why == null && type.id == booking.rideTypeId,
+                  onTap: why != null
+                      ? null
+                      : () => ref
+                            .read(bookingControllerProvider.notifier)
+                            .selectRideType(type.id),
                   onInfo: () => _showFareBreakdown(
                     context,
                     type,
@@ -466,17 +483,33 @@ class _RideTypeCard extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onInfo,
+    this.unavailable,
   });
 
   final RideType type;
   final int fare;
   final int discount;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final VoidCallback onInfo;
+
+  /// Shown greyed out with this reason, and can't be picked.
+  final String? unavailable;
 
   @override
   Widget build(BuildContext context) {
+    final card = _card(context);
+    if (unavailable == null) return card;
+    return Opacity(
+      opacity: 0.45,
+      child: ColorFiltered(
+        colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.saturation),
+        child: card,
+      ),
+    );
+  }
+
+  Widget _card(BuildContext context) {
     return Material(
       color: selected ? AppColors.primaryLight : Colors.white,
       shape: RoundedRectangleBorder(
@@ -515,37 +548,47 @@ class _RideTypeCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.schedule,
-                          size: 13,
+                    if (unavailable != null)
+                      Text(
+                        unavailable!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                           color: AppColors.textSecondary,
                         ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${type.etaMinutes.$1}-${type.etaMinutes.$2} mins',
-                          style: TextStyle(
-                            fontSize: 12,
+                      )
+                    else
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.schedule,
+                            size: 13,
                             color: AppColors.textSecondary,
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Icon(
-                          Icons.person_outline,
-                          size: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${type.passengers}',
-                          style: TextStyle(
-                            fontSize: 12,
+                          const SizedBox(width: 3),
+                          Text(
+                            '${type.etaMinutes.$1}-${type.etaMinutes.$2} mins',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Icon(
+                            Icons.person_outline,
+                            size: 13,
                             color: AppColors.textSecondary,
                           ),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${type.passengers}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),

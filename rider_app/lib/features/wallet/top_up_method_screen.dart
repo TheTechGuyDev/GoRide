@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:goride_core/goride_core.dart' show PaystackCheckout;
+import 'package:goride_core/goride_core.dart'
+    show PaystackCheckout, paystackFee;
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/money.dart';
@@ -191,6 +192,28 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
             const SizedBox(height: 14),
           ],
           const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                _line('Added to your wallet', naira(widget.amount)),
+                const SizedBox(height: 6),
+                _line('Paystack fee', naira(paystackFee(widget.amount))),
+                const Divider(height: 22),
+                _line(
+                  'You pay',
+                  naira(widget.amount + paystackFee(widget.amount)),
+                  bold: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -209,7 +232,7 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
           child: AppButton(
-            label: 'Confirm Top Up · ${naira(widget.amount)}',
+            label: 'Pay ${naira(widget.amount + paystackFee(widget.amount))}',
             loading: _busy,
             onPressed: () => _confirm(selected),
           ),
@@ -217,4 +240,22 @@ class _TopUpMethodScreenState extends ConsumerState<TopUpMethodScreen> {
       ),
     );
   }
+
+  Widget _line(String a, String b, {bool bold = false}) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          a,
+          style: TextStyle(
+            fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+            color: bold ? null : AppColors.textSecondary,
+          ),
+        ),
+      ),
+      Text(
+        b,
+        style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w600),
+      ),
+    ],
+  );
 }

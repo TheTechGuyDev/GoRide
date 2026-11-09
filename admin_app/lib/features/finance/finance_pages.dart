@@ -687,6 +687,8 @@ class PricingPage extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         const EnginePanel(),
+        const SizedBox(height: 16),
+        const RideRulesPanel(),
       ],
     );
   }

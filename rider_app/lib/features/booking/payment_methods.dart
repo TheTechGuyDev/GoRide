@@ -190,7 +190,7 @@ class PaymentMethodsController extends Notifier<List<PaymentMethod>> {
             kind: PaymentKind.card,
             title:
                 '${r['brand']}${r['is_default'] == true ? ' (default)' : ''}',
-            subtitle: '•••• •••• •••• ${r['last4']}  ·  ${r['exp']}',
+            subtitle: '•••• ${r['last4']}  ·  ${r['exp']}  ·  1.5% card fee',
           ),
         _builtIn[2],
       ];
@@ -204,8 +204,9 @@ class PaymentMethodsController extends Notifier<List<PaymentMethod>> {
       builder: (ctx) => AlertDialog(
         title: const Text('Add a card'),
         content: const Text(
-          'Paystack will charge your card 100 naira to save it securely. '
-          'The 100 naira goes into your GoRide wallet, so you lose nothing.',
+          'Paystack will charge your card 102 naira (100 naira plus a 2 naira '
+          'Paystack fee) to save it securely. The 100 naira goes into your '
+          'GoRide wallet.',
         ),
         actions: [
           TextButton(

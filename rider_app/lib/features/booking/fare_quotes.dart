@@ -10,8 +10,12 @@ import 'ride_types.dart';
 /// airport fee and long-pickup fee. The app shows exactly what will be
 /// charged.
 class FareQuote {
-  const FareQuote(this.fare, this.surge, this.breakdown);
+  const FareQuote(this.fare, this.surge, this.breakdown, [this.unavailable]);
   final int fare;
+
+  /// Why this ride type can't be booked here right now (e.g. "Available
+  /// 5:30am to 10:30pm"), or null when it can.
+  final String? unavailable;
   final double surge;
   final Map<String, dynamic> breakdown;
 
@@ -57,6 +61,7 @@ final fareQuotesProvider =
             ((e.value as Map)['fare'] as num).toInt(),
             ((e.value as Map)['surge'] as num).toDouble(),
             Map<String, dynamic>.from(e.value['breakdown'] as Map),
+            (e.value as Map)['unavailable'] as String?,
           ),
       };
     });

@@ -48,8 +48,6 @@ class NearbyVehiclesController extends Notifier<List<NearbyVehicle>> {
   Timer? _timer;
   LatLng? _center;
 
-  static const _radiusMetres = 5000.0;
-
   @override
   List<NearbyVehicle> build() {
     final loc = ref.watch(locationControllerProvider);
@@ -67,45 +65,36 @@ class NearbyVehiclesController extends Notifier<List<NearbyVehicle>> {
   Future<void> _load() async {
     final c = _center;
     if (c == null) return;
-    // Rough box first (cheap), then exact distance.
-    const dLat = 0.05;
-    final dLng = 0.05 / cos(c.latitude * pi / 180);
+    // Anonymized nearby pins from the server (no driver ids or exact GPS, so
+    // no one can track a specific driver from the rider app).
     try {
-      final rows = await Backend.db
-          .from('driver_locations')
-          .select('driver_id, lat, lng, heading, ride_type_id, on_trip')
-          .eq('online', true)
-          .eq('on_trip', false)
-          .gte('lat', c.latitude - dLat)
-          .lte('lat', c.latitude + dLat)
-          .gte('lng', c.longitude - dLng)
-          .lte('lng', c.longitude + dLng)
-          .limit(30);
-      const distance = Distance();
+      final rows =
+          await Backend.db.rpc(
+                'nearby_drivers',
+                params: {
+                  'p_ride_type': null,
+                  'p_lat': c.latitude,
+                  'p_lng': c.longitude,
+                },
+              )
+              as List;
+      var i = 0;
       state = [
         for (final r in rows)
           if (r['lat'] != null && r['lng'] != null)
-            if (distance(
-                  c,
-                  LatLng(
-                    (r['lat'] as num).toDouble(),
-                    (r['lng'] as num).toDouble(),
-                  ),
-                ) <=
-                _radiusMetres)
-              NearbyVehicle(
-                id: r['driver_id'] as String,
-                position: LatLng(
-                  (r['lat'] as num).toDouble(),
-                  (r['lng'] as num).toDouble(),
-                ),
-                heading: (r['heading'] as num?)?.toDouble() ?? 0,
-                type: switch (r['ride_type_id']) {
-                  'bike' => VehicleType.bike,
-                  'keke' => VehicleType.keke,
-                  _ => VehicleType.car,
-                },
+            NearbyVehicle(
+              id: 'pin_${i++}',
+              position: LatLng(
+                (r['lat'] as num).toDouble(),
+                (r['lng'] as num).toDouble(),
               ),
+              heading: (r['heading'] as num?)?.toDouble() ?? 0,
+              type: switch (r['ride_type_id']) {
+                'bike' => VehicleType.bike,
+                'keke' => VehicleType.keke,
+                _ => VehicleType.car,
+              },
+            ),
       ];
     } catch (_) {}
   }

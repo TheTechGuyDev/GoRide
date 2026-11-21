@@ -306,15 +306,11 @@ class EarningsController extends Notifier<EarningsState> {
             .select()
             .order('created_at', ascending: false)
             .limit(1000),
-        Backend.db
-            .from('app_settings')
-            .select(
-              'power_driver_enabled, power_driver_trips, power_driver_rate',
-            )
-            .eq('id', 1)
-            .maybeSingle(),
+        Backend.db.rpc('public_app_settings'),
       ]);
-      final ps = results[2] as Map<String, dynamic>?;
+      final ps = results[2] == null
+          ? null
+          : Map<String, dynamic>.from(results[2] as Map);
       final trips = [
         for (final t in results[0] as List)
           _trip(Map<String, dynamic>.from(t as Map)),

@@ -10,13 +10,29 @@
 // Successful card payments save the card (Paystack authorization) for reuse.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
+// CORS: allow all origins by default; once ALLOWED_ORIGINS (comma-separated)
+// is set in the function's secrets, only those web origins are reflected.
+const baseCors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+const allowedOrigins = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+function corsFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  const allow = allowedOrigins.length === 0
+    ? "*"
+    : (allowedOrigins.includes(origin) ? origin : allowedOrigins[0]);
+  return { ...baseCors, "Access-Control-Allow-Origin": allow, "Vary": "Origin" };
+}
+
+// Constant-time comparison of two equal-length hex strings (webhook signature).
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length || a.length === 0) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -91,6 +107,10 @@ async function verifyAndCredit(sk: string, reference: string) {
 }
 
 Deno.serve(async (req) => {
+  const cors = corsFor(req);
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   const raw = await req.text();
@@ -99,7 +119,7 @@ Deno.serve(async (req) => {
   // Webhook from Paystack (signed with the secret key).
   const signature = req.headers.get("x-paystack-signature");
   if (signature) {
-    if (!sk || (await hmac512(sk, raw)) !== signature) return json({ error: "bad signature" }, 401);
+    if (!sk || !timingSafeEqualHex(await hmac512(sk, raw), signature)) return json({ error: "bad signature" }, 401);
     const event = JSON.parse(raw);
     if (event?.event === "charge.success") {
       await credit(event.data);
@@ -144,6 +164,12 @@ Deno.serve(async (req) => {
       return json({ error: "Amount must be between 100 and 500,000 naira." }, 400);
     }
     const purpose = ["settle", "add_card"].includes(String(body.purpose)) ? String(body.purpose) : "top_up";
+    // Rate limit: at most 6 payment starts per user per minute.
+    const { count } = await admin.from("paystack_payments")
+      .select("reference", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", new Date(Date.now() - 60000).toISOString());
+    if ((count ?? 0) >= 6) return json({ error: "Too many attempts. Please wait a minute and try again." }, 429);
     const reference = `GR-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
     const fee = feeFor(amount);
     const { error } = await admin.from("paystack_payments").insert({ reference, user_id: user.id, amount, purpose, fee });

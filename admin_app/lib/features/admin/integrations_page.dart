@@ -193,6 +193,31 @@ const _services = [
     optional: true,
   ),
   _Service(
+    title: 'Address search & map pins',
+    icon: Icons.search_outlined,
+    what: 'Makes address search and the pickup pin far more accurate than the free OpenStreetMap default. Geoapify is free, needs no card, and covers launch volumes (about 3,000 searches a day). Leave both empty to keep OpenStreetMap.',
+    fields: [
+      _Field(
+        'geoapify_key',
+        'Geoapify API key',
+      ),
+      _Field(
+        'mapbox_token',
+        'Mapbox token (alternative, needs a card)',
+        hint: 'pk....',
+      ),
+    ],
+    steps: [
+      'Create a free account at geoapify.com (no card needed).',
+      'Verify your email, then open the Projects page (MyProjects).',
+      'Create a project; it generates an API key for you.',
+      'Copy that API key.',
+      'Optional: in the key settings you can restrict it to your app.',
+      'Paste it in the Geoapify API key field below. Apps pick it up the next time they open. Remove it to go back to OpenStreetMap.',
+    ],
+    optional: true,
+  ),
+  _Service(
     title: 'SMS codes (later)',
     icon: Icons.sms_outlined,
     what: 'Optional, for sending sign-in codes by SMS instead of email (costs about 4 to 8 naira per SMS). Saved for when we switch it on.',

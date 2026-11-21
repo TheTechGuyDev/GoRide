@@ -63,7 +63,7 @@ jobs:
           # Website: landing page, privacy, terms, account deletion
           cp -r website/. site/
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
